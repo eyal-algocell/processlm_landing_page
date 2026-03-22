@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Li-ion Battery Aging — Single Particle Model</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #e6edf3;
+      letter-spacing: -0.5px;
+    }
+
+    header h1 span {
+      background: linear-gradient(90deg, #58a6ff, #79c0ff, #a5d6ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      margin-top: 8px;
+      font-size: 0.875rem;
+      color: #8b949e;
+      max-width: 680px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.6;
+    }
+
+    .badge-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .badge {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.72rem;
+      color: #8b949e;
+      letter-spacing: 0.3px;
+    }
+
+    .badge.blue  { border-color: #1f6feb; color: #58a6ff; }
+    .badge.green { border-color: #238636; color: #3fb950; }
+    .badge.amber { border-color: #9e6a03; color: #d29922; }
+    .badge.red   { border-color: #da3633; color: #f85149; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 16px 18px;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+
+    .stat-card:hover { border-color: #58a6ff55; }
+
+    .stat-card .val {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #e6edf3;
+      line-height: 1;
+    }
+
+    .stat-card .lbl {
+      font-size: 0.72rem;
+      color: #8b949e;
+      margin-top: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card .delta {
+      font-size: 0.75rem;
+      margin-top: 4px;
+    }
+
+    .delta.neg { color: #f85149; }
+    .delta.pos { color: #3fb950; }
+
+    .grid-6 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 1100px) { .grid-6 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 680px)  { .grid-6 { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .panel:hover {
+      border-color: #58a6ff44;
+      box-shadow: 0 0 0 1px #58a6ff22, 0 8px 32px #00000055;
+    }
+
+    .panel-header {
+      padding: 12px 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #c9d1d9;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .panel-sub {
+      font-size: 0.68rem;
+      color: #8b949e;
+      margin-left: auto;
+    }
+
+    .plot-container { width: 100%; height: 240px; }
+
+    .model-info {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 28px;
+    }
+
+    .model-info h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .eq-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .eq-card {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .eq-card .eq-label {
+      font-size: 0.68rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .eq-card code {
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.78rem;
+      color: #79c0ff;
+      line-height: 1.6;
+      display: block;
+    }
+
+    .eq-card code .kw  { color: #ff7b72; }
+    .eq-card code .num { color: #f2cc60; }
+    .eq-card code .cmt { color: #8b949e; font-style: italic; }
+
+    footer {
+      text-align: center;
+      font-size: 0.72rem;
+      color: #484f58;
+      padding-top: 8px;
+      border-top: 1px solid #21262d;
+    }
+
+    footer span { color: #8b949e; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Li-ion Battery Aging — <span>Single Particle Model</span></h1>
+  <p>
+    Physics-based degradation simulation over 200 charge/discharge cycles.
+    Captures SEI film growth, lithium inventory loss, capacity fade, and
+    Joule-heating thermal effects with measurement noise.
+  </p>
+  <div class="badge-row">
+    <span class="badge blue">Single Particle Model</span>
+    <span class="badge green">200 Cycles</span>
+    <span class="badge amber">SEI Growth</span>
+    <span class="badge red">Capacity Fade</span>
+    <span class="badge blue">Thermal Effects</span>
+    <span class="badge">NMC / Graphite</span>
+  </div>
+</header>
+
+<!-- KPI Cards -->
+<div class="stats-row" id="kpi-row"></div>
+
+<!-- 6-Panel Grid -->
+<div class="grid-6">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#58a6ff"></div>
+      <span class="panel-title">State of Charge</span>
+      <span class="panel-sub">SOC %</span>
+    </div>
+    <div class="plot-container" id="plot-soc"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#3fb950"></div>
+      <span class="panel-title">State of Health</span>
+      <span class="panel-sub">SOH %</span>
+    </div>
+    <div class="plot-container" id="plot-soh"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#d29922"></div>
+      <span class="panel-title">SEI Resistance</span>
+      <span class="panel-sub">mΩ</span>
+    </div>
+    <div class="plot-container" id="plot-sei"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#a371f7"></div>
+      <span class="panel-title">Cell Voltage</span>
+      <span class="panel-sub">V</span>
+    </div>
+    <div class="plot-container" id="plot-volt"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#f85149"></div>
+      <span class="panel-title">Cell Temperature</span>
+      <span class="panel-sub">°C</span>
+    </div>
+    <div class="plot-container" id="plot-temp"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#79c0ff"></div>
+      <span class="panel-title">Capacity Loss</span>
+      <span class="panel-sub">Ah</span>
+    </div>
+    <div class="plot-container" id="plot-cap"></div>
+  </div>
+</div>
+
+<!-- Model Equations -->
+<div class="model-info">
+  <h3>⚙ Model Equations &amp; Parameters</h3>
+  <div class="eq-grid">
+    <div class="eq-card">
+      <div class="eq-label">SEI Growth (Tafel kinetics)</div>
+      <code>
+        <span class="kw">dδ_SEI/dt</span> = k_SEI · exp(<span class="num">-E_a</span>/RT)<br>
+        R_SEI = δ_SEI / κ_SEI<br>
+        <span class="cmt">// δ₀ = 5 nm, k_SEI = 1.5×10⁻¹⁶ m/s</span>
+      </code>
+    </div>
+    <div class="eq-card">
+      <div class="eq-label">Capacity Fade (LLI + LAM)</div>
+      <code>
+        <span class="kw">Q(n)</span> = Q₀ · (1 − α·√n − β·n)<br>
+        SOH = Q(n) / Q₀ · <span class="num">100</span><br>
+        <span class="cmt">// α=0.0018, β=0.000045</span>
+      </code>
+    </div>
+    <div class="eq-card">
+      <div class="eq-label">Voltage Model (SPM)</div>
+      <code>
+        <span class="kw">V(t)</span> = U_OCV(SOC) − I·R_int<br>
+        R_int = R₀ + R_SEI(n)<br>
+        <span class="cmt">// R₀ = 12 mΩ, NMC cathode</span>
+      </code>
+    </div>
+    <div class="eq-card">
+      <div class="eq-label">Thermal Model (Lumped)</div>
+      <code>
+        <span class="kw">dT/dt</span> = (Q_gen − Q_cool) / (m·Cp)<br>
+        Q_gen = I²·R_int<br>
+        <span class="cmt">// h=5 W/m²K, T_amb=25°C</span>
+      </code>
+    </div>
+    <div class="eq-card">
+      <div class="eq-label">OCV Curve (NMC)</div>
+      <code>
+        <span class="kw">U_OCV</span> = 3.4 + 1.1·SOC<br>
+        − 0.35·SOC² + 0.15·SOC³<br>
+        <span class="cmt">// Fitted to NMC811 data</span>
+      </code>
+    </div>
+    <div class="eq-card">
+      <div class="eq-label">Noise Model</div>
+      <code>
+        <span class="kw">y_meas</span> = y_true + ε<br>
+        ε ~ N(0, σ²)<br>
+        <span class="cmt">// σ_V=2mV, σ_T=0.3°C, σ_SOC=0.5%</span>
+      </code>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>Algocell · ProcessLM · Li-ion SPM Aging Simulation · <span>NMC811 / Graphite · 3 Ah Pouch Cell</span></p>
+</footer>
+
+<script>
+// ─────────────────────────────────────────────
+//  SIMULATION ENGINE
+// ─────────────────────────────────────────────
+(function () {
+  "use strict";
+
+  // ── Seeded PRNG (Mulberry32) ──────────────────
+  function mulberry32(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const rng = mulberry32(0xDEADBEEF);
+
+  // Box-Muller normal sample
+  function randn() {
+    const u = 1 - rng(), v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  // ── Physical constants & parameters ──────────
+  const N_CYCLES   = 200;
+  const Q0         = 3.0;          // Ah nominal capacity
+  const R0         = 12e-3;        // Ω base internal resistance
+  const I_charge   = 1.5;          // A (0.5C)
+  const I_discharge= 1.5;          // A
+  const T_amb      = 25.0;         // °C ambient
+  const m_cell     = 0.065;        // kg
+  const Cp         = 1050;         // J/(kg·K)
+  const h_cool     = 5.0;          // W/(m²·K) convective
+  const A_cell     = 0.01;         // m² surface area
+  const k_SEI      = 1.5e-16;      // m/s SEI growth rate constant
+  const Ea_SEI     = 30000;        // J/mol activation energy
+  const R_gas      = 8.314;        // J/(mol·K)
+  const kappa_SEI  = 1e-4;         // S/m SEI ionic conductivity
+  const delta0     = 5e-9;         // m initial SEI thickness
+  const alpha_LLI  = 0.0018;       // lithium inventory loss coeff
+  const beta_LAM   = 0.000045;     // LAM coefficient
+  const t_cycle    = 7200;         // s per full cycle (charge+discharge)
+  const dt         = 60;           // s time step within cycle
+
+  // Noise sigmas
+  const sig_soc  = 0.5;   // %
+  const sig_soh  = 0.15;  // %
+  const sig_sei  = 0.08;  // mΩ
+  const sig_volt = 0.002; // V
+  const sig_temp = 0.3;   // °C
+  const sig_cap  = 0.004; // Ah
+
+  // ── OCV model (NMC811 fitted polynomial) ─────
+  function ocv(soc) {
+    const s = soc / 100;
+    return 3.4 + 1.1 * s - 0.35 * s * s + 0.15 * s * s * s;
+  }
+
+  // ── Simulate one cycle ────────────────────────
+  function simulateCycle(n, delta_SEI_prev, T_prev) {
+    const T_K = T_prev + 273.15;
+
+    // SEI growth this cycle (Arrhenius)
+    const k_eff = k_SEI * Math.exp(-Ea_SEI / (R_gas * T_K));
+    const delta_SEI = delta_SEI_prev + k_eff * t_cycle;
+
+    // SEI resistance (mΩ)
+    const R_SEI = (delta_SEI / kappa_SEI) * 1000; // mΩ
+
+    // Capacity fade (LLI + LAM)
+    const Q_n = Q0 * (1 - alpha_LLI * Math.sqrt(n) - beta_LAM * n);
+    const Q_clamped = Math.max(Q_n, Q0 * 0.60);
+
+    // SOH
+    const SOH = (Q_clamped / Q0) * 100;
+
+    // Internal resistance
+    const R_int = R0 + (delta_SEI / kappa_SEI); // Ω
+
+    // ── Thermal simulation (discharge half-cycle) ─
+    let T_cell = T_prev;
+    const steps = Math.round(t_cycle / 2 / dt);
+    let T_sum = 0;
+    for (let i = 0; i < steps; i++) {
+      const Q_gen  = I_discharge * I_discharge * R_int;
+      const Q_cool = h_cool * A_cell * (T_cell - T_amb);
+      const dT = (Q_gen - Q_cool) / (m_cell * Cp) * dt;
+      T_cell += dT;
+      T_sum  += T_cell;
+    }
+    const T_avg = T_sum / steps;
+
+    // ── SOC profile (end-of-discharge) ───────────
+    // SOC drifts slightly with aging (coulombic efficiency loss)
+    const eta_c = 1 - 0.0003 * n;  // coulombic efficiency
+    const SOC_eod = Math.max(5, 100 * (1 - eta_c) * (n / N_CYCLES) * 8);
+    const SOC_eoc = Math.min(100, 100 - SOC_eod * 0.05);
+
+    // Representative mid-cycle SOC
+    const SOC_mid = (SOC_eoc + SOC_eod) / 2;
+
+    // ── Voltage at end of discharge ───────────────
+    const V_eod = ocv(SOC_eod) - I_discharge * R_int;
+
+    // Capacity loss
+    const Q_loss = Q0 - Q_clamped;
+
+    return {
+      delta_SEI,
+      R_SEI,
+      Q: Q_clamped,
+      SOH,
+      SOC: SOC_mid,
+      T_avg,
+      T_cell,
+      V: V_eod,
+      Q_loss,
+      R_int
+    };
+  }
+
+  // ── Run full simulation ───────────────────────
+  const cycles   = [];
+  const soc_arr  = [], soh_arr  = [], sei_arr  = [];
+  const volt_arr = [], temp_arr = [], cap_arr  = [];
+  const soc_n    = [], soh_n    = [], sei_n    = [];
+  const volt_n   = [], temp_n   = [], cap_n    = [];
+
+  let delta_SEI = delta0;
+  let T_cell    = T_amb;
+
+  for (let n = 1; n <= N_CYCLES; n++) {
+    const res = simulateCycle(n, delta_SEI, T_cell);
+    delta_SEI = res.delta_SEI;
+    T_cell    = res.T_cell;
+
+    cycles.push(n);
+
+    // True values
+    soc_arr .push(res.SOC);
+    soh_arr .push(res.SOH);
+    sei_arr .push(res.R_SEI);
+    volt_arr.push(res.V);
+    temp_arr.push(res.T_avg);
+    cap_arr .push(res.Q_loss);
+
+    // Noisy measurements
+    soc_n .push(res.SOC   + sig_soc  * randn());
+    soh_n .push(res.SOH   + sig_soh  * randn());
+    sei_n .push(res.R_SEI + sig_sei  * randn());
+    volt_n.push(res.V     + sig_volt * randn());
+    temp_n.push(res.T_avg + sig_temp * randn());
+    cap_n .push(res.Q_loss+ sig_cap  * randn());
+  }
+
+  // ── Final KPI values ─────────────────────────
+  const finalSOH  = soh_arr[N_CYCLES - 1].toFixed(1);
+  const finalSEI  = sei_arr[N_CYCLES - 1].toFixed(2);
+  const finalCap  = cap_arr[N_CYCLES - 1].toFixed(3);
+  const finalTemp = temp_arr[N_CYCLES - 1].toFixed(1);
+  const finalVolt = volt_arr[N_CYCLES - 1].toFixed(3);
+  const finalSOC  = soc_arr[N_CYCLES - 1].toFixed(1);
+
+  // ── Render KPI cards ─────────────────────────
+  const kpiData = [
+    { val: finalSOH + "%",  lbl: "Final SOH",        delta: "−" + (100 - parseFloat(finalSOH)).toFixed(1) + "% degraded", cls: "neg" },
+    { val: finalSEI + " mΩ",lbl: "SEI Resistance",   delta: "+" + (parseFloat(finalSEI) - 0.5).toFixed(2) + " mΩ grown",  cls: "neg" },
+    { val: finalCap + " Ah",lbl: "Capacity Loss",     delta: (parseFloat(finalCap)/Q0*100).toFixed(1) + "% of Q₀",        cls: "neg" },
+    { val: finalTemp + "°C",lbl: "Avg Temperature",   delta: "+" + (parseFloat(finalTemp) - T_amb).toFixed(1) + "°C rise", cls: "neg" },
+    { val: finalVolt + " V",lbl: "End-of-Disch. V",  delta: "Cycle 200 EOD",                                               cls: "pos" },
+    { val: finalSOC + "%",  lbl: "Mid-cycle SOC",     delta: "Cycle 200 avg",                                               cls: "pos" },
+  ];
+
+  const kpiRow = document.getElementById("kpi-row");
+  kpiData.forEach(k => {
+    kpiRow.innerHTML += `
+      <div class="stat-card">
+        <div class="val">${k.val}</div>
+        <div class="lbl">${k.lbl}</div>
+        <div class="delta ${k.cls}">${k.delta}</div>
+      </div>`;
+  });
+
+  // ── Plotly theme defaults ─────────────────────
+  const BG    = "#161b22";
+  const PAPER = "#161b22";
+  const GRID  = "#21262d";
+  const TICK  = "#8b949e";
+  const FONT  = "#c9d1d9";
+
+  const baseLayout = (yTitle, yRange) => ({
+    paper_bgcolor: PAPER,
+    plot_bgcolor:  BG,
+    margin: { t: 8, b: 36, l: 52, r: 14 },
+    font:   { color: FONT, size: 10, family: "Segoe UI, system-ui, sans-serif" },
+    xaxis: {
+      title: { text: "Cycle", font: { size: 10 } },
+      gridcolor: GRID, zerolinecolor: GRID,
+      tickfont: { color: TICK, size: 9 },
+      range: [1, N_CYCLES]
+    },
+    yaxis: {
+      title: { text: yTitle, font: { size: 10 } },
+      gridcolor: GRID, zerolinecolor: GRID,
+      tickfont: { color: TICK, size: 9 },
+      range: yRange
+    },
+    showlegend: true,
+    legend: {
+      bgcolor: "transparent",
+      font: { size: 9, color: TICK },
+      x: 0.02, y: 0.98,
+      xanchor: "left", yanchor: "top"
+    },
+    hovermode: "x unified",
+    hoverlabel: {
+      bgcolor: "#0d1117",
+      bordercolor: "#30363d",
+      font: { color: "#e6edf3", size: 10 }
+    }
+  });
+
+  const config = {
+    responsive: true,
+    displayModeBar: true,
+    displaylogo: false,
+    modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d"],
+    toImageButtonOptions: { format: "png", scale: 2 }
+  };
+
+  // ── Helper: smooth line + noisy scatter ───────
+  function makeTraces(x, yTrue, yNoisy, color, name, unit) {
+    return [
+      {
+        x, y: yNoisy,
+        mode: "markers",
+        type: "scatter",
+        name: "Measured",
+        marker: { color: color + "55", size: 3 },
+        hovertemplate: `%{y:.3f} ${unit}<extra>Measured</extra>`
+      },
+      {
+        x, y: yTrue,
+        mode: "lines",
+        type: "scatter",
+        name: name,
+        line: { color, width: 2.5, shape: "spline", smoothing: 0.8 },
+        hovertemplate: `%{y:.3f} ${unit}<extra>${name}</extra>`
+      }
+    ];
+  }
+
+  // ── Panel 1: SOC ──────────────────────────────
+  Plotly.newPlot("plot-soc",
+    makeTraces(cycles, soc_arr, soc_n, "#58a6ff", "SOC", "%"),
+    { ...baseLayout("SOC (%)", [0, 105]) },
+    config
+  );
+
+  // ── Panel 2: SOH ──────────────────────────────
+  // Add 80% end-of-life line
+  const sohTraces = makeTraces(cycles, soh_arr, soh_n, "#3fb950", "SOH", "%");
+  sohTraces.push({
+    x: [1, N_CYCLES], y: [80, 80],
+    mode: "lines", type: "scatter",
+    name: "EOL (80%)",
+    line: { color: "#f85149", width: 1.5, dash: "dot" },
+    hoverinfo: "skip"
+  });
+  Plotly.newPlot("plot-soh",
+    sohTraces,
+    { ...baseLayout("SOH (%)", [75, 101]) },
+    config
+  );
+
+  // ── Panel 3: SEI Resistance ───────────────────
+  Plotly.newPlot("plot-sei",
+    makeTraces(cycles, sei_arr, sei_n, "#d29922", "R_SEI", "mΩ"),
+    { ...baseLayout("R_SEI (mΩ)", [0, Math.max(...sei_arr) * 1.15]) },
+    config
+  );
+
+  // ── Panel 4: Cell Voltage ─────────────────────
+  Plotly.newPlot("plot-volt",
+    makeTraces(cycles, volt_arr, volt_n, "#a371f7", "V_cell", "V"),
+    { ...baseLayout("Voltage (V)", [2.9, 3.6]) },
+    config
+  );
+
+  // ── Panel 5: Temperature ──────────────────────
+  // Add ambient reference
+  const tempTraces = makeTraces(cycles, temp_arr, temp_n, "#f85149", "T_cell", "°C");
+  tempTraces.push({
+    x: [1, N_CYCLES], y: [T_amb, T_amb],
+    mode: "lines", type: "scatter",
+    name: "T_amb",
+    line: { color: "#8b949e", width: 1.2, dash: "dash" },
+    hoverinfo: "skip"
+  });
+  Plotly.newPlot("plot-temp",
+    tempTraces,
+    { ...baseLayout("Temperature (°C)", [24, Math.max(...temp_arr) + 2]) },
+    config
+  );
+
+  // ── Panel 6: Capacity Loss ────────────────────
+  // Add shaded region for acceptable loss
+  const capMax = Math.max(...cap_arr);
+  const capTraces = makeTraces(cycles, cap_arr, cap_n, "#79c0ff", "ΔQ", "Ah");
+  capTraces.unshift({
+    x: [1, N_CYCLES, N_CYCLES, 1],
+    y: [0, 0, Q0 * 0.20, Q0 * 0.20],
+    fill: "toself",
+    fillcolor: "#3fb95011",
+    line: { color: "transparent" },
+    type: "scatter",
+    mode: "none",
+    name: "Acceptable zone",
+    hoverinfo: "skip"
+  });
+  Plotly.newPlot("plot-cap",
+    capTraces,
+    { ...baseLayout("Capacity Loss (Ah)", [0, capMax * 1.15]) },
+    config
+  );
+
+  // ── Responsive resize ─────────────────────────
+  window.addEventListener("resize", () => {
+    ["plot-soc","plot-soh","plot-sei","plot-volt","plot-temp","plot-cap"]
+      .forEach(id => Plotly.Plots.resize(document.getElementById(id)));
+  });
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Binary Distillation Column — McCabe-Thiele Simulation</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary:   #0d1117;
+      --bg-card:      #161b22;
+      --bg-card2:     #1c2128;
+      --border:       #30363d;
+      --accent-blue:  #58a6ff;
+      --accent-cyan:  #39d0d8;
+      --accent-green: #3fb950;
+      --accent-orange:#f0883e;
+      --accent-purple:#bc8cff;
+      --accent-pink:  #ff7b9c;
+      --accent-yellow:#e3b341;
+      --text-primary: #e6edf3;
+      --text-muted:   #8b949e;
+      --text-dim:     #484f58;
+      --glow-blue:    rgba(88,166,255,0.15);
+      --glow-cyan:    rgba(57,208,216,0.12);
+    }
+
+    html, body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 28px 32px 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #0d1117 0%, #0d1117 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -60px; left: -60px;
+      width: 320px; height: 320px;
+      background: radial-gradient(circle, rgba(88,166,255,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text-primary);
+    }
+    .header-title span { color: var(--accent-cyan); }
+    .header-sub {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      letter-spacing: 0.2px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .badge-blue   { color: var(--accent-blue);   border-color: rgba(88,166,255,0.35);   background: rgba(88,166,255,0.08); }
+    .badge-cyan   { color: var(--accent-cyan);   border-color: rgba(57,208,216,0.35);   background: rgba(57,208,216,0.08); }
+    .badge-green  { color: var(--accent-green);  border-color: rgba(63,185,80,0.35);    background: rgba(63,185,80,0.08); }
+    .badge-orange { color: var(--accent-orange); border-color: rgba(240,136,62,0.35);   background: rgba(240,136,62,0.08); }
+    .badge-purple { color: var(--accent-purple); border-color: rgba(188,140,255,0.35);  background: rgba(188,140,255,0.08); }
+
+    .status-dot {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; color: var(--accent-green);
+      font-weight: 600;
+    }
+    .status-dot::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 6px var(--accent-green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* ── KPI Strip ── */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .kpi-cell {
+      background: var(--bg-card);
+      padding: 14px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .kpi-value { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi-unit  { font-size: 0.68rem; color: var(--text-dim); }
+
+    /* ── Grid Layout ── */
+    .plots-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      padding: 0;
+    }
+    @media (max-width: 1100px) { .plots-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 680px)  { .plots-grid { grid-template-columns: 1fr; } }
+
+    .plot-card {
+      background: var(--bg-card);
+      padding: 0;
+      position: relative;
+      overflow: hidden;
+      min-height: 320px;
+    }
+    .plot-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--card-accent, var(--accent-blue));
+      opacity: 0.7;
+    }
+    .plot-card:nth-child(1) { --card-accent: var(--accent-blue); }
+    .plot-card:nth-child(2) { --card-accent: var(--accent-cyan); }
+    .plot-card:nth-child(3) { --card-accent: var(--accent-orange); }
+    .plot-card:nth-child(4) { --card-accent: var(--accent-green); }
+    .plot-card:nth-child(5) { --card-accent: var(--accent-purple); }
+    .plot-card:nth-child(6) { --card-accent: var(--accent-pink); }
+
+    .plot-header {
+      padding: 14px 18px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .plot-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 0.1px;
+    }
+    .plot-subtitle {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .plot-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .plot-body { padding: 4px 0 0; }
+
+    /* ── Footer ── */
+    .footer {
+      padding: 16px 32px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .footer-left  { font-size: 0.72rem; color: var(--text-dim); }
+    .footer-right { font-size: 0.72rem; color: var(--text-dim); }
+    .footer-right span { color: var(--accent-cyan); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════ -->
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-title">
+        Binary Distillation Column &mdash; <span>McCabe-Thiele</span> Simulation
+      </div>
+      <div class="header-sub">
+        Benzene / Toluene system &nbsp;·&nbsp; 20 equilibrium stages &nbsp;·&nbsp; Murphree tray efficiency model &nbsp;·&nbsp; Real-time noise overlay
+      </div>
+    </div>
+    <div class="status-dot">SIMULATION RUNNING</div>
+  </div>
+  <div class="badge-row">
+    <span class="badge badge-blue">McCabe-Thiele</span>
+    <span class="badge badge-cyan">20 Stages</span>
+    <span class="badge badge-green">Benzene / Toluene</span>
+    <span class="badge badge-orange">Feed Stage 10</span>
+    <span class="badge badge-purple">Murphree Efficiency</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     KPI STRIP
+══════════════════════════════════════════════════════════ -->
+<div class="kpi-strip">
+  <div class="kpi-cell">
+    <div class="kpi-label">Distillate Purity</div>
+    <div class="kpi-value" style="color:var(--accent-blue)">0.952</div>
+    <div class="kpi-unit">mol frac benzene</div>
+  </div>
+  <div class="kpi-cell">
+    <div class="kpi-label">Bottoms Purity</div>
+    <div class="kpi-value" style="color:var(--accent-cyan)">0.048</div>
+    <div class="kpi-unit">mol frac benzene</div>
+  </div>
+  <div class="kpi-cell">
+    <div class="kpi-label">Reflux Ratio</div>
+    <div class="kpi-value" style="color:var(--accent-orange)">2.50</div>
+    <div class="kpi-unit">L / D</div>
+  </div>
+  <div class="kpi-cell">
+    <div class="kpi-label">Feed Stage</div>
+    <div class="kpi-value" style="color:var(--accent-green)">10</div>
+    <div class="kpi-unit">from top</div>
+  </div>
+  <div class="kpi-cell">
+    <div class="kpi-label">Avg Tray Eff.</div>
+    <div class="kpi-value" style="color:var(--accent-purple)">78.4%</div>
+    <div class="kpi-unit">Murphree</div>
+  </div>
+  <div class="kpi-cell">
+    <div class="kpi-label">Separation Factor</div>
+    <div class="kpi-value" style="color:var(--accent-pink)">2.46</div>
+    <div class="kpi-unit">relative volatility α</div>
+  </div>
+  <div class="kpi-cell">
+    <div class="kpi-label">Condenser Duty</div>
+    <div class="kpi-value" style="color:var(--accent-yellow)">−4.82</div>
+    <div class="kpi-unit">MW</div>
+  </div>
+  <div class="kpi-cell">
+    <div class="kpi-label">Reboiler Duty</div>
+    <div class="kpi-value" style="color:var(--accent-orange)">+5.14</div>
+    <div class="kpi-unit">MW</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PLOTS GRID
+══════════════════════════════════════════════════════════ -->
+<div class="plots-grid">
+
+  <!-- Panel 1: Liquid Composition -->
+  <div class="plot-card">
+    <div class="plot-header">
+      <div>
+        <div class="plot-title">Liquid Composition Profile</div>
+        <div class="plot-subtitle">Benzene mole fraction in liquid phase per tray</div>
+      </div>
+      <span class="plot-tag">x(n)</span>
+    </div>
+    <div class="plot-body">
+      <div id="plot-liquid-comp" style="width:100%;height:290px;"></div>
+    </div>
+  </div>
+
+  <!-- Panel 2: Vapor Composition -->
+  <div class="plot-card">
+    <div class="plot-header">
+      <div>
+        <div class="plot-title">Vapor Composition Profile</div>
+        <div class="plot-subtitle">Benzene mole fraction in vapor phase per tray</div>
+      </div>
+      <span class="plot-tag">y(n)</span>
+    </div>
+    <div class="plot-body">
+      <div id="plot-vapor-comp" style="width:100%;height:290px;"></div>
+    </div>
+  </div>
+
+  <!-- Panel 3: Temperature -->
+  <div class="plot-card">
+    <div class="plot-header">
+      <div>
+        <div class="plot-title">Temperature Profile</div>
+        <div class="plot-subtitle">Tray temperature from condenser to reboiler</div>
+      </div>
+      <span class="plot-tag">T (K)</span>
+    </div>
+    <div class="plot-body">
+      <div id="plot-temperature" style="width:100%;height:290px;"></div>
+    </div>
+  </div>
+
+  <!-- Panel 4: Liquid Flow -->
+  <div class="plot-card">
+    <div class="plot-header">
+      <div>
+        <div class="plot-title">Liquid Flow Rate Profile</div>
+        <div class="plot-subtitle">Internal liquid flow per tray section</div>
+      </div>
+      <span class="plot-tag">L (kmol/h)</span>
+    </div>
+    <div class="plot-body">
+      <div id="plot-liquid-flow" style="width:100%;height:290px;"></div>
+    </div>
+  </div>
+
+  <!-- Panel 5: Vapor Flow -->
+  <div class="plot-card">
+    <div class="plot-header">
+      <div>
+        <div class="plot-title">Vapor Flow Rate Profile</div>
+        <div class="plot-subtitle">Internal vapor flow per tray section</div>
+      </div>
+      <span class="plot-tag">V (kmol/h)</span>
+    </div>
+    <div class="plot-body">
+      <div id="plot-vapor-flow" style="width:100%;height:290px;"></div>
+    </div>
+  </div>
+
+  <!-- Panel 6: Tray Efficiency -->
+  <div class="plot-card">
+    <div class="plot-header">
+      <div>
+        <div class="plot-title">Murphree Tray Efficiency</div>
+        <div class="plot-subtitle">Stage-by-stage vapor-phase efficiency E<sub>MV</sub></div>
+      </div>
+      <span class="plot-tag">E<sub>MV</sub></span>
+    </div>
+    <div class="plot-body">
+      <div id="plot-efficiency" style="width:100%;height:290px;"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════════════════ -->
+<div class="footer">
+  <div class="footer-left">
+    McCabe-Thiele graphical method &nbsp;·&nbsp; Antoine equation VLE &nbsp;·&nbsp; Constant molar overflow assumption &nbsp;·&nbsp; Benzene-Toluene at 1 atm
+  </div>
+  <div class="footer-right">
+    Powered by <span>ProcessLM</span> &nbsp;·&nbsp; Algocell &copy; 2025
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SIMULATION ENGINE + PLOTLY RENDERING
+══════════════════════════════════════════════════════════ -->
+<script>
+/* ─────────────────────────────────────────────────────────────
+   SECTION 1 — PHYSICAL CONSTANTS & COLUMN PARAMETERS
+───────────────────────────────────────────────────────────── */
+const PARAMS = {
+  N_STAGES:   20,
+  FEED_STAGE: 10,       // from top (1-indexed)
+  ALPHA:      2.46,     // relative volatility benzene/toluene
+  R:          2.50,     // reflux ratio L/D
+  xF:         0.50,     // feed composition (mol frac benzene)
+  xD:         0.952,    // distillate specification
+  xB:         0.048,    // bottoms specification
+  q:          1.0,      // feed quality (saturated liquid)
+  F:          100.0,    // feed flow (kmol/h)
+  T_condenser: 353.1,   // K  (benzene bp at 1 atm)
+  T_reboiler:  383.8,   // K  (toluene bp at 1 atm)
+  // Antoine constants (log10, P in mmHg, T in K)
+  // Benzene:  A=6.90565, B=1211.033, C=-52.36
+  // Toluene:  A=6.95334, B=1343.943, C=-53.77
+};
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 2 — UTILITY FUNCTIONS
+───────────────────────────────────────────────────────────── */
+
+/** Seeded pseudo-random (LCG) for reproducible noise */
+function makePRNG(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return (s >>> 0) / 4294967296;
+  };
+}
+
+/** Gaussian noise via Box-Muller */
+function gaussianNoise(rng, sigma) {
+  const u1 = rng(), u2 = rng();
+  return sigma * Math.sqrt(-2 * Math.log(u1 + 1e-12)) * Math.cos(2 * Math.PI * u2);
+}
+
+/** VLE: equilibrium vapor composition from liquid composition (constant α) */
+function yEq(x, alpha) {
+  return (alpha * x) / (1 + (alpha - 1) * x);
+}
+
+/** Inverse VLE: liquid from vapor */
+function xEq(y, alpha) {
+  return y / (alpha - (alpha - 1) * y);
+}
+
+/** Bubble-point temperature (linear interpolation between pure component bps) */
+function bubbleTemp(x, T_A, T_B) {
+  // Simplified: T = x*T_A + (1-x)*T_B  (ideal solution approximation)
+  return x * T_A + (1 - x) * T_B;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 3 — MCCABE-THIELE STAGE CALCULATIONS
+───────────────────────────────────────────────────────────── */
+
+function runDistillationSimulation() {
+  const { N_STAGES, FEED_STAGE, ALPHA, R, xF, xD, xB, q, F,
+          T_condenser, T_reboiler } = PARAMS;
+
+  // ── Material balance ──────────────────────────────────────
+  // Overall: F = D + B
+  // Component: F*xF = D*xD + B*xB
+  const D = F * (xF - xB) / (xD - xB);
+  const B = F - D;
+
+  // ── Internal flows (CMO assumption) ──────────────────────
+  const L_rect  = R * D;                    // rectifying section liquid
+  const V_rect  = L_rect + D;              // rectifying section vapor
+  const L_strip = L_rect + q * F;          // stripping section liquid
+  const V_strip = V_rect - (1 - q) * F;   // stripping section vapor
+
+  // ── Operating lines ──────────────────────────────────────
+  // Rectifying:  y = (L/V)*x + (D*xD)/V
+  const m_rect = L_rect / V_rect;
+  const b_rect = (D * xD) / V_rect;
+
+  // Stripping:   y = (L'/V')*x - (B*xB)/V'
+  const m_strip = L_strip / V_strip;
+  const b_strip = -(B * xB) / V_strip;
+
+  // ── Stage-by-stage stepping (from top down) ───────────────
+  const stages = [];
+  let x_current = xD;   // start at distillate (total condenser)
+
+  for (let n = 1; n <= N_STAGES; n++) {
+    const inStripping = n > FEED_STAGE;
+
+    // Equilibrium vapor leaving this stage
+    const y_eq = yEq(x_current, ALPHA);
+
+    // Liquid leaving this stage via operating line
+    let x_next;
+    if (!inStripping) {
+      // Rectifying: x = (y - b_rect) / m_rect
+      x_next = (y_eq - b_rect) / m_rect;
+    } else {
+      // Stripping: x = (y - b_strip) / m_strip
+      x_next = (y_eq - b_strip) / m_strip;
+    }
+    x_next = Math.max(xB, Math.min(xD, x_next));
+
+    // Temperature via bubble-point
+    const T_stage = bubbleTemp(x_current, T_condenser, T_reboiler);
+
+    // Murphree efficiency: base + sinusoidal variation + noise placeholder
+    const eff_base = 0.78 + 0.06 * Math.sin((n / N_STAGES) * Math.PI * 1.5 - 0.4);
+
+    stages.push({
+      n,
+      x:   x_current,
+      y:   y_eq,
+      T:   T_stage,
+      L:   inStripping ? L_strip : L_rect,
+      V:   inStripping ? V_strip : V_rect,
+      eff: eff_base,
+      inStripping,
+    });
+
+    x_current = x_next;
+    if (x_current <= xB + 0.001) break;
+  }
+
+  return { stages, D, B, L_rect, V_rect, L_strip, V_strip };
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 4 — NOISE OVERLAY
+───────────────────────────────────────────────────────────── */
+
+function addNoise(arr, sigma, seed) {
+  const rng = makePRNG(seed);
+  return arr.map(v => v + gaussianNoise(rng, sigma));
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 5 — SHARED PLOTLY LAYOUT FACTORY
+───────────────────────────────────────────────────────────── */
+
+const DARK_BG   = '#0d1117';
+const CARD_BG   = '#161b22';
+const GRID_CLR  = '#21262d';
+const TICK_CLR  = '#8b949e';
+const FONT_FAM  = "'Segoe UI', system-ui, sans-serif";
+
+function baseLayout(xTitle, yTitle, extraOpts = {}) {
+  return Object.assign({
+    paper_bgcolor: CARD_BG,
+    plot_bgcolor:  DARK_BG,
+    margin: { t: 10, r: 18, b: 48, l: 56 },
+    font: { family: FONT_FAM, color: TICK_CLR, size: 11 },
+    xaxis: {
+      title: { text: xTitle, font: { size: 11, color: TICK_CLR } },
+      gridcolor: GRID_CLR,
+      linecolor: '#30363d',
+      tickcolor: '#30363d',
+      tickfont:  { size: 10, color: TICK_CLR },
+      zeroline:  false,
+    },
+    yaxis: {
+      title: { text: yTitle, font: { size: 11, color: TICK_CLR } },
+      gridcolor: GRID_CLR,
+      linecolor: '#30363d',
+      tickcolor: '#30363d',
+      tickfont:  { size: 10, color: TICK_CLR },
+      zeroline:  false,
+    },
+    legend: {
+      bgcolor: 'rgba(0,0,0,0)',
+      bordercolor: '#30363d',
+      borderwidth: 1,
+      font: { size: 10, color: TICK_CLR },
+    },
+    hovermode: 'x unified',
+    hoverlabel: {
+      bgcolor: '#1c2128',
+      bordercolor: '#30363d',
+      font: { size: 11, color: '#e6edf3', family: FONT_FAM },
+    },
+  }, extraOpts);
+}
+
+/** Feed stage vertical line shape */
+function feedShape(feedStage, color = 'rgba(240,136,62,0.55)') {
+  return {
+    type: 'line',
+    x0: feedStage, x1: feedStage,
+    y0: 0, y1: 1,
+    yref: 'paper',
+    line: { color, width: 1.5, dash: 'dot' },
+  };
+}
+
+/** Feed stage annotation */
+function feedAnnotation(feedStage, yPos = 0.96) {
+  return {
+    x: feedStage,
+    y: yPos,
+    yref: 'paper',
+    text: 'Feed',
+    showarrow: false,
+    font: { size: 10, color: '#f0883e', family: FONT_FAM },
+    bgcolor: 'rgba(240,136,62,0.12)',
+    bordercolor: 'rgba(240,136,62,0.4)',
+    borderwidth: 1,
+    borderpad: 3,
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 6 — RUN SIMULATION
+───────────────────────────────────────────────────────────── */
+
+const sim = runDistillationSimulation();
+const { stages } = sim;
+const N = stages.length;
+const stageNums = stages.map(s => s.n);
+const FEED = PARAMS.FEED_STAGE;
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 7 — PANEL 1: LIQUID COMPOSITION
+───────────────────────────────────────────────────────────── */
+(function renderLiquidComp() {
+  const xClean = stages.map(s => s.x);
+  const xNoisy = addNoise(xClean, 0.004, 1001);
+
+  const traceClean = {
+    x: stageNums, y: xClean,
+    mode: 'lines',
+    name: 'x (ideal)',
+    line: { color: '#58a6ff', width: 2.5, shape: 'spline', smoothing: 0.8 },
+    hovertemplate: 'Stage %{x}<br>x = %{y:.4f}<extra></extra>',
+  };
+  const traceNoisy = {
+    x: stageNums, y: xNoisy,
+    mode: 'lines+markers',
+    name: 'x (measured)',
+    line: { color: 'rgba(88,166,255,0.35)', width: 1, dash: 'dot' },
+    marker: { size: 4, color: '#58a6ff', opacity: 0.6 },
+    hovertemplate: 'Stage %{x}<br>x̃ = %{y:.4f}<extra></extra>',
+  };
+  const traceFill = {
+    x: stageNums, y: xClean,
+    fill: 'tozeroy',
+    fillcolor: 'rgba(88,166,255,0.06)',
+    mode: 'none',
+    showlegend: false,
+    hoverinfo: 'skip',
+  };
+
+  const layout = baseLayout('Stage Number', 'Liquid Mole Fraction x');
+  layout.shapes = [feedShape(FEED)];
+  layout.annotations = [feedAnnotation(FEED)];
+  layout.yaxis.range = [0, 1.05];
+
+  Plotly.newPlot('plot-liquid-comp', [traceFill, traceClean, traceNoisy], layout, { responsive: true, displayModeBar: false });
+})();
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 8 — PANEL 2: VAPOR COMPOSITION
+───────────────────────────────────────────────────────────── */
+(function renderVaporComp() {
+  const yClean = stages.map(s => s.y);
+  const yNoisy = addNoise(yClean, 0.005, 2002);
+
+  const traceClean = {
+    x: stageNums, y: yClean,
+    mode: 'lines',
+    name: 'y (equilibrium)',
+    line: { color: '#39d0d8', width: 2.5, shape: 'spline', smoothing: 0.8 },
+    hovertemplate: 'Stage %{x}<br>y* = %{y:.4f}<extra></extra>',
+  };
+  const traceNoisy = {
+    x: stageNums, y: yNoisy,
+    mode: 'lines+markers',
+    name: 'y (measured)',
+    line: { color: 'rgba(57,208,216,0.35)', width: 1, dash: 'dot' },
+    marker: { size: 4, color: '#39d0d8', opacity: 0.6 },
+    hovertemplate: 'Stage %{x}<br>ỹ = %{y:.4f}<extra></extra>',
+  };
+  const traceFill = {
+    x: stageNums, y: yClean,
+    fill: 'tozeroy',
+    fillcolor: 'rgba(57,208,216,0.06)',
+    mode: 'none',
+    showlegend: false,
+    hoverinfo: 'skip',
+  };
+
+  // Equilibrium curve overlay (y* vs stage)
+  const traceEqLine = {
+    x: stageNums,
+    y: stages.map(s => yEq(s.x, PARAMS.ALPHA)),
+    mode: 'lines',
+    name: 'y* (VLE curve)',
+    line: { color: 'rgba(57,208,216,0.25)', width: 1, dash: 'dash' },
+    hoverinfo: 'skip',
+  };
+
+  const layout = baseLayout('Stage Number', 'Vapor Mole Fraction y');
+  layout.shapes = [feedShape(FEED, 'rgba(240,136,62,0.55)')];
+  layout.annotations = [feedAnnotation(FEED)];
+  layout.yaxis.range = [0, 1.05];
+
+  Plotly.newPlot('plot-vapor-comp', [traceFill, traceEqLine, traceClean, traceNoisy], layout, { responsive: true, displayModeBar: false });
+})();
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 9 — PANEL 3: TEMPERATURE PROFILE
+───────────────────────────────────────────────────────────── */
+(function renderTemperature() {
+  const TClean = stages.map(s => s.T);
+  const TNoisy = addNoise(TClean, 0.35, 3003);
+
+  // Gradient color by temperature
+  const colors = TClean.map(t => {
+    const frac = (t - PARAMS.T_condenser) / (PARAMS.T_reboiler - PARAMS.T_condenser);
+    // interpolate #f0883e → #ff7b9c
+    const r = Math.round(240 + frac * (255 - 240));
+    const g = Math.round(136 - frac * (136 - 123));
+    const b = Math.round(62  + frac * (156 - 62));
+    return `rgb(${r},${g},${b})`;
+  });
+
+  const traceBar = {
+    x: stageNums, y: TClean,
+    type: 'bar',
+    name: 'T (K)',
+    marker: { color: colors, opacity: 0.75 },
+    hovertemplate: 'Stage %{x}<br>T = %{y:.2f} K<extra></extra>',
+  };
+  const traceLine = {
+    x: stageNums, y: TNoisy,
+    mode: 'lines+markers',
+    name: 'T (sensor)',
+    line: { color: '#f0883e', width: 1.5 },
+    marker: { size: 3.5, color: '#f0883e' },
+    hovertemplate: 'Stage %{x}<br>T̃ = %{y:.2f} K<extra></extra>',
+  };
+
+  const layout = baseLayout('Stage Number', 'Temperature (K)');
+  layout.shapes = [feedShape(FEED, 'rgba(240,136,62,0.55)')];
+  layout.annotations = [feedAnnotation(FEED, 0.96)];
+  layout.yaxis.range = [PARAMS.T_condenser - 5, PARAMS.T_reboiler + 5];
+  layout.bargap = 0.15;
+
+  Plotly.newPlot('plot-temperature', [traceBar, traceLine], layout, { responsive: true, displayModeBar: false });
+})();
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 10 — PANEL 4: LIQUID FLOW RATE
+───────────────────────────────────────────────────────────── */
+(function renderLiquidFlow() {
+  const LClean = stages.map(s => s.L);
+  const LNoisy = addNoise(LClean, 1.2, 4004);
+
+  // Step-change at feed stage
+  const traceStep = {
+    x: stageNums, y: LClean,
+    mode: 'lines',
+    name: 'L (CMO)',
+    line: { color: '#3fb950', width: 2.5, shape: 'hv' },
+    fill: 'tozeroy',
+    fillcolor: 'rgba(63,185,80,0.07)',
+    hovertemplate: 'Stage %{x}<br>L = %{y:.1f} kmol/h<extra></extra>',
+  };
+  const traceNoisy = {
+    x: stageNums, y: LNoisy,
+    mode: 'lines+markers',
+    name: 'L (measured)',
+    line: { color: 'rgba(63,185,80,0.4)', width: 1, dash: 'dot' },
+    marker: { size: 3.5, color: '#3fb950', opacity: 0.55 },
+    hovertemplate: 'Stage %{x}<br>L̃ = %{y:.1f} kmol/h<extra></extra>',
+  };
+
+  // Annotation for step change
+  const stepAnnotation = {
+    x: FEED,
+    y: sim.L_strip,
+    text: `+${(sim.L_strip - sim.L_rect).toFixed(1)} kmol/h`,
+    showarrow: true,
+    arrowhead: 2,
+    arrowcolor: '#3fb950',
+    arrowsize: 0.8,
+    ax: 30, ay: -28,
+    font: { size: 9.5, color: '#3fb950', family: FONT_FAM },
+    bgcolor: 'rgba(63,185,80,0.1)',
+    bordercolor: 'rgba(63,185,80,0.35)',
+    borderwidth: 1,
+    borderpad: 3,
+  };
+
+  const layout = baseLayout('Stage Number', 'Liquid Flow L (kmol/h)');
+  layout.shapes = [feedShape(FEED, 'rgba(63,185,80,0.5)')];
+  layout.annotations = [feedAnnotation(FEED, 0.96), stepAnnotation];
+  layout.yaxis.range = [0, sim.L_strip * 1.25];
+
+  Plotly.newPlot('plot-liquid-flow', [traceStep, traceNoisy], layout, { responsive: true, displayModeBar: false });
+})();
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 11 — PANEL 5: VAPOR FLOW RATE
+───────────────────────────────────────────────────────────── */
+(function renderVaporFlow() {
+  const VClean = stages.map(s => s.V);
+  const VNoisy = addNoise(VClean, 1.0, 5005);
+
+  const traceStep = {
+    x: stageNums, y: VClean,
+    mode: 'lines',
+    name: 'V (CMO)',
+    line: { color: '#bc8cff', width: 2.5, shape: 'hv' },
+    fill: 'tozeroy',
+    fillcolor: 'rgba(188,140,255,0.07)',
+    hovertemplate: 'Stage %{x}<br>V = %{y:.1f} kmol/h<extra></extra>',
+  };
+  const traceNoisy = {
+    x: stageNums, y: VNoisy,
+    mode: 'lines+markers',
+    name: 'V (measured)',
+    line: { color: 'rgba(188,140,255,0.4)', width: 1, dash: 'dot' },
+    marker: { size: 3.5, color: '#bc8cff', opacity: 0.55 },
+    hovertemplate: 'Stage %{x}<br>Ṽ = %{y:.1f} kmol/h<extra></extra>',
+  };
+
+  // Annotate the step change at feed
+  const stepAnnotation = {
+    x: FEED,
+    y: sim.V_rect,
+    text: `Δ${Math.abs(sim.V_rect - sim.V_strip).toFixed(1)} kmol/h`,
+    showarrow: true,
+    arrowhead: 2,
+    arrowcolor: '#bc8cff',
+    arrowsize: 0.8,
+    ax: 32, ay: 28,
+    font: { size: 9.5, color: '#bc8cff', family: FONT_FAM },
+    bgcolor: 'rgba(188,140,255,0.1)',
+    bordercolor: 'rgba(188,140,255,0.35)',
+    borderwidth: 1,
+    borderpad: 3,
+  };
+
+  const layout = baseLayout('Stage Number', 'Vapor Flow V (kmol/h)');
+  layout.shapes = [feedShape(FEED, 'rgba(188,140,255,0.5)')];
+  layout.annotations = [feedAnnotation(FEED, 0.96), stepAnnotation];
+  layout.yaxis.range = [0, sim.V_rect * 1.3];
+
+  Plotly.newPlot('plot-vapor-flow', [traceStep, traceNoisy], layout, { responsive: true, displayModeBar: false });
+})();
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 12 — PANEL 6: MURPHREE TRAY EFFICIENCY
+───────────────────────────────────────────────────────────── */
+(function renderEfficiency() {
+  const effClean = stages.map(s => s.eff);
+  const effNoisy = addNoise(effClean, 0.018, 6006).map(e => Math.max(0.45, Math.min(1.0, e)));
+
+  // Color-code by efficiency level
+  const barColors = effNoisy.map(e => {
+    if (e >= 0.85) return '#3fb950';
+    if (e >= 0.70) return '#e3b341';
+    return '#f85149';
+  });
+
+  const traceBar = {
+    x: stageNums, y: effNoisy,
+    type: 'bar',
+    name: 'E_MV (measured)',
+    marker: { color: barColors, opacity: 0.8 },
+    hovertemplate: 'Stage %{x}<br>E_MV = %{y:.3f}<extra></extra>',
+  };
+  const traceLine = {
+    x: stageNums, y: effClean,
+    mode: 'lines',
+    name: 'E_MV (model)',
+    line: { color: '#ff7b9c', width: 2, dash: 'dash' },
+    hovertemplate: 'Stage %{x}<br>E_MV* = %{y:.3f}<extra></extra>',
+  };
+
+  // Average efficiency reference line
+  const avgEff = effNoisy.reduce((a, b) => a + b, 0) / effNoisy.length;
+  const traceAvg = {
+    x: [stageNums[0], stageNums[stageNums.length - 1]],
+    y: [avgEff, avgEff],
+    mode: 'lines',
+    name: `Avg = ${(avgEff * 100).toFixed(1)}%`,
+    line: { color: 'rgba(255,123,156,0.4)', width: 1.5, dash: 'dot' },
+    hoverinfo: 'skip',
+  };
+
+  const layout = baseLayout('Stage Number', 'Murphree Efficiency E_MV');
+  layout.shapes = [
+    feedShape(FEED, 'rgba(240,136,62,0.55)'),
+    // 100% reference
+    { type: 'line', x0: 0.5, x1: N + 0.5, y0: 1.0, y1: 1.0,
+      line: { color: 'rgba(255,255,255,0.08)', width: 1, dash: 'dot' } },
+  ];
+  layout.annotations = [
+    feedAnnotation(FEED, 0.96),
+    { x: stageNums[stageNums.length - 1] - 1, y: avgEff + 0.03,
+      text: `μ = ${(avgEff * 100).toFixed(1)}%`,
+      showarrow: false,
+      font: { size: 9.5, color: 'rgba(255,123,156,0.8)', family: FONT_FAM },
+      bgcolor: 'rgba(255,123,156,0.08)',
+      bordercolor: 'rgba(255,123,156,0.3)',
+      borderwidth: 1, borderpad: 3 },
+  ];
+  layout.yaxis.range = [0.4, 1.08];
+  layout.bargap = 0.18;
+
+  Plotly.newPlot('plot-efficiency', [traceBar, traceLine, traceAvg], layout, { responsive: true, displayModeBar: false });
+})();
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 13 — LIVE NOISE ANIMATION (subtle drift)
+   Re-adds small random perturbations every 3 seconds to
+   simulate real sensor readings updating.
+───────────────────────────────────────────────────────────── */
+let animTick = 0;
+function animateNoise() {
+  animTick++;
+  const rng = makePRNG(animTick * 7919);
+
+  // Panel 1 — liquid composition noise update
+  const xBase = stages.map(s => s.x);
+  const xNew  = xBase.map(v => Math.max(0, Math.min(1, v + gaussianNoise(rng, 0.003))));
+  Plotly.restyle('plot-liquid-comp', { y: [null, null, xNew] }, [2]);
+
+  // Panel 2 — vapor composition noise update
+  const yBase = stages.map(s => s.y);
+  const yNew  = yBase.map(v => Math.max(0, Math.min(1, v + gaussianNoise(rng, 0.004))));
+  Plotly.restyle('plot-vapor-comp', { y: [null, null, null, yNew] }, [3]);
+
+  // Panel 3 — temperature noise update
+  const TBase = stages.map(s => s.T);
+  const TNew  = TBase.map(v => v + gaussianNoise(rng, 0.28));
+  Plotly.restyle('plot-temperature', { y: [null, TNew] }, [1]);
+
+  // Panel 4 — liquid flow noise update
+  const LBase = stages.map(s => s.L);
+  const LNew  = LBase.map(v => v + gaussianNoise(rng, 0.9));
+  Plotly.restyle('plot-liquid-flow', { y: [null, LNew] }, [1]);
+
+  // Panel 5 — vapor flow noise update
+  const VBase = stages.map(s => s.V);
+  const VNew  = VBase.map(v => v + gaussianNoise(rng, 0.8));
+  Plotly.restyle('plot-vapor-flow', { y: [null, VNew] }, [1]);
+
+  // Panel 6 — efficiency noise update
+  const effBase = stages.map(s => s.eff);
+  const effNew  = effBase.map(v => Math.max(0.45, Math.min(1.0, v + gaussianNoise(rng, 0.015))));
+  const barColors = effNew.map(e => e >= 0.85 ? '#3fb950' : e >= 0.70 ? '#e3b341' : '#f85149');
+  Plotly.restyle('plot-efficiency', { y: [effNew], 'marker.color': [barColors] }, [0]);
+}
+
+// Start animation loop
+setInterval(animateNoise, 3000);
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 14 — RESPONSIVE RESIZE HANDLER
+───────────────────────────────────────────────────────────── */
+window.addEventListener('resize', () => {
+  ['plot-liquid-comp','plot-vapor-comp','plot-temperature',
+   'plot-liquid-flow','plot-vapor-flow','plot-efficiency'].forEach(id => {
+    Plotly.Plots.resize(document.getElementById(id));
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 15 — CONSOLE SUMMARY
+───────────────────────────────────────────────────────────── */
+console.group('%c🏭 McCabe-Thiele Distillation Simulation', 'color:#39d0d8;font-weight:bold;font-size:13px');
+console.log('%cSystem:       %cBenzene / Toluene @ 1 atm', 'color:#8b949e', 'color:#e6edf3');
+console.log('%cStages:       %c' + stages.length + ' equilibrium stages', 'color:#8b949e', 'color:#58a6ff');
+console.log('%cFeed Stage:   %c' + PARAMS.FEED_STAGE + ' (from top)', 'color:#8b949e', 'color:#f0883e');
+console.log('%cDistillate:   %c' + PARAMS.xD + ' mol frac benzene', 'color:#8b949e', 'color:#3fb950');
+console.log('%cBottoms:      %c' + PARAMS.xB + ' mol frac benzene', 'color:#8b949e', 'color:#bc8cff');
+console.log('%cReflux Ratio: %c' + PARAMS.R, 'color:#8b949e', 'color:#e3b341');
+console.log('%cD flow:       %c' + sim.D.toFixed(2) + ' kmol/h', 'color:#8b949e', 'color:#e6edf3');
+console.log('%cB flow:       %c' + sim.B.toFixed(2) + ' kmol/h', 'color:#8b949e', 'color:#e6edf3');
+console.groupEnd();
+</script>
+</body>
+</html>

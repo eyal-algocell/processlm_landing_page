@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚗️ ProcessLM — Hybrid Modeling Infrastructure</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚗️</text></svg>" />
+  <meta name="description" content="Describe your system in plain language. ProcessLM builds the mechanistic model, fits it to your experimental data, and identifies the operating conditions that maximize your target outcome." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0a0b0d;
+      --bg-card:    #111318;
+      --bg-subtle:  #16191f;
+      --border:     rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text:       #f0f2f5;
+      --text-muted: #7a8394;
+      --text-dim:   #4a5568;
+      --accent:     #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --accent-glow:rgba(79,142,247,0.25);
+      --green:      #34d399;
+      --green-dim:  rgba(52,211,153,0.1);
+      --amber:      #f59e0b;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem; height: 60px;
+      background: rgba(10,11,13,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-size: 1rem; font-weight: 600; letter-spacing: -0.01em;
+      color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .nav-logo-emoji {
+      font-size: 1.1rem; line-height: 1;
+    }
+    .nav-links { display: flex; align-items: center; gap: 2rem; list-style: none; }
+    .nav-links a {
+      color: var(--text-muted); text-decoration: none;
+      font-size: 0.875rem; transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent); color: #fff;
+      padding: 0.45rem 1.1rem; border-radius: 6px;
+      font-size: 0.875rem; font-weight: 500;
+      text-decoration: none; transition: opacity 0.15s;
+    }
+    .nav-cta:hover { opacity: 0.88; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 6rem 2rem 5rem;
+      text-align: center; position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 50% 0%, rgba(79,142,247,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 80% 80%, rgba(52,211,153,0.04) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--accent-dim); border: 1px solid rgba(79,142,247,0.2);
+      border-radius: 100px; padding: 0.3rem 0.85rem;
+      font-size: 0.78rem; font-weight: 500; color: var(--accent);
+      letter-spacing: 0.02em; text-transform: uppercase; margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700; line-height: 1.15; letter-spacing: -0.03em;
+      max-width: 820px; margin-bottom: 1.5rem;
+    }
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #fff 0%, #a0b4cc 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-muted); max-width: 600px;
+      line-height: 1.7; margin-bottom: 2.5rem;
+    }
+    .hero-actions {
+      display: flex; gap: 1rem; flex-wrap: wrap;
+      justify-content: center; margin-bottom: 4rem;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      padding: 0.75rem 1.75rem; border-radius: 8px; border: none;
+      font-size: 0.95rem; font-weight: 500; cursor: pointer;
+      text-decoration: none; transition: opacity 0.15s, transform 0.1s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-secondary {
+      background: transparent; color: var(--text-muted);
+      padding: 0.75rem 1.75rem; border-radius: 8px;
+      border: 1px solid var(--border-mid);
+      font-size: 0.95rem; font-weight: 400; cursor: pointer;
+      text-decoration: none; transition: border-color 0.15s, color 0.15s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
+
+    /* ── APP SCREENSHOT FRAME ── */
+    .app-frame {
+      width: 100%; max-width: 900px;
+      border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+      position: relative;
+    }
+    .app-frame-bar {
+      padding: 0.65rem 1rem; background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .traffic-light { display: flex; gap: 0.4rem; }
+    .tl { width: 10px; height: 10px; border-radius: 50%; }
+    .tl-r{background:#ff5f57} .tl-y{background:#febc2e} .tl-g{background:#28c840}
+    .app-frame-label { font-size: 0.75rem; color: var(--text-dim); margin-left: 0.5rem; }
+    .app-frame img, .app-frame video {
+      width: 100%; display: block;
+    }
+
+    /* ── SCREENSHOT SHOWCASE ── */
+    .screenshot-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .screenshot-card {
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+      background: var(--bg-card); transition: border-color 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+    .screenshot-card:hover { border-color: var(--border-mid); transform: translateY(-2px); }
+    .screenshot-card img {
+      width: 100%; display: block;
+      border-bottom: 1px solid var(--border);
+    }
+    .screenshot-caption {
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem; color: var(--text-muted);
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .screenshot-caption strong { color: var(--text); font-weight: 500; }
+
+    /* ── SECTION COMMONS ── */
+    section { padding: 5rem 2rem; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.6rem, 3vw, 2.5rem);
+      font-weight: 700; letter-spacing: -0.025em;
+      line-height: 1.2; margin-bottom: 1rem;
+    }
+    .section-sub {
+      font-size: 1.05rem; color: var(--text-muted);
+      max-width: 560px; line-height: 1.7;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .steps {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1px; background: var(--border);
+      border: 1px solid var(--border); border-radius: 14px;
+      overflow: visible; margin-top: 3rem;
+    }
+    .step:first-child  { border-radius: 14px 0 0 14px; }
+    .step:last-child   { border-radius: 0 14px 14px 0; }
+    .step:nth-child(1) { z-index: 4; }
+    .step:nth-child(2) { z-index: 3; }
+    .step:nth-child(3) { z-index: 2; }
+    .step:nth-child(4) { z-index: 1; }
+    .step { background: var(--bg-card); padding: 2rem 1.75rem; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .step-num { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1rem; align-self: flex-start; }
+    .step-icon { font-size: 1.75rem; margin-bottom: 0.85rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+    .step h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .step p  { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; }
+    .step-connector {
+      position: absolute; right: -13px; top: 50%; transform: translateY(-50%);
+      width: 26px; height: 26px; background: var(--bg-subtle);
+      border: 1px solid var(--border-mid); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2; color: var(--accent); font-size: 0;
+    }
+    .step-connector::after {
+      content: '';
+      display: block;
+      width: 6px; height: 6px;
+      border-top: 1.5px solid var(--accent);
+      border-right: 1.5px solid var(--accent);
+      transform: rotate(45deg) translate(-1px, 1px);
+    }
+
+    /* ── CAPABILITIES ── */
+    .capabilities { background: var(--bg-subtle); }
+    .cap-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .cap-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.75rem; transition: border-color 0.2s;
+    }
+    .cap-card:hover { border-color: var(--border-mid); }
+    .cap-card-icon {
+      width: 40px; height: 40px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; margin-bottom: 1rem;
+    }
+    .cap-card-icon.blue  { background: var(--accent-dim); }
+    .cap-card-icon.green { background: var(--green-dim); }
+    .cap-card-icon.amber { background: rgba(245,158,11,0.1); }
+    .cap-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .cap-card p  { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; }
+
+    /* ── OBJECTION HANDLING ── */
+    .objections { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .obj-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem; margin-top: 2.5rem;
+    }
+    .obj-card {
+      display: flex; gap: 1rem; align-items: flex-start;
+    }
+    .obj-icon {
+      width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+      background: var(--accent-dim); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+    }
+    .obj-card h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .obj-card p  { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+
+    /* ── PROOF BAR ── */
+    .proof-bar {
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      padding: 2rem; text-align: center;
+    }
+    .proof-bar p { font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1.5rem; }
+    .proof-logos { display: flex; gap: 3rem; justify-content: center; flex-wrap: wrap; align-items: center; }
+    .proof-logo { font-size: 0.8rem; font-weight: 600; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; }
+
+    /* ── USE CASES ── */
+    .use-case-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .uc-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
+      display: block; transition: all 0.3s ease;
+    }
+    .uc-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(79, 142, 247, 0.15);
+    }
+    .uc-tag {
+      display: inline-block; background: var(--accent-dim); color: var(--accent);
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 0.2rem 0.6rem; border-radius: 4px; margin-bottom: 0.75rem;
+    }
+    .uc-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .uc-card p  { font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; }
+
+    /* ── TEAM ── */
+    .team-section { background: var(--bg-subtle); }
+    .team-box {
+      max-width: 680px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 2.5rem;
+      display: flex; gap: 2rem; align-items: flex-start;
+      margin-top: 2.5rem;
+    }
+    .team-logo {
+      width: 56px; height: 56px; border-radius: 12px; flex-shrink: 0;
+      background: var(--accent-dim); border: 1px solid rgba(79,142,247,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+    }
+    .team-box h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .team-box p  { font-size: 0.9rem; color: var(--text-muted); line-height: 1.65; }
+
+    /* ── FAQ ── */
+    .faq-list { margin-top: 2.5rem; display: flex; flex-direction: column; gap: 0; }
+    .faq-item {
+      border-top: 1px solid var(--border);
+    }
+    .faq-item:last-child { border-bottom: 1px solid var(--border); }
+    .faq-question {
+      width: 100%; background: none; border: none; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.25rem 0; text-align: left; gap: 1rem;
+      color: var(--text); font-size: 0.95rem; font-weight: 500;
+      font-family: inherit; transition: color 0.15s;
+    }
+    .faq-question:hover { color: var(--accent); }
+    .faq-chevron { flex-shrink: 0; transition: transform 0.2s; color: var(--text-dim); }
+    .faq-item.open .faq-chevron { transform: rotate(180deg); }
+    .faq-answer {
+      font-size: 0.9rem; color: var(--text-muted); line-height: 1.7;
+      max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.2s;
+      padding: 0;
+    }
+    .faq-item.open .faq-answer { max-height: 400px; padding-bottom: 1.25rem; }
+
+    /* ── WAITLIST ── */
+    .waitlist-section {
+      background: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(79,142,247,0.07) 0%, transparent 70%);
+    }
+    .waitlist-box { max-width: 580px; margin: 0 auto; text-align: center; }
+    .waitlist-box .section-title { margin-bottom: 0.75rem; }
+    .waitlist-box .section-sub { margin: 0 auto 1.5rem; }
+
+    /* Social proof counter */
+    .waitlist-counter {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--green-dim); border: 1px solid rgba(52,211,153,0.2);
+      border-radius: 100px; padding: 0.3rem 0.9rem;
+      font-size: 0.82rem; color: var(--green); font-weight: 500;
+      margin-bottom: 1.75rem;
+    }
+    .waitlist-counter-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+    /* Alpha benefits */
+    .alpha-benefits {
+      display: flex; flex-direction: column; gap: 0.6rem;
+      margin-bottom: 2rem; text-align: left;
+    }
+    .alpha-benefit {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      font-size: 0.875rem; color: var(--text-muted);
+    }
+    .alpha-benefit-check {
+      color: var(--green); font-size: 0.85rem; flex-shrink: 0; margin-top: 1px;
+    }
+
+    .waitlist-form { display: flex; flex-direction: column; gap: 0.75rem; align-items: stretch; }
+    .waitlist-form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .waitlist-input {
+      flex: 1; min-width: 200px;
+      background: var(--bg-card); color: var(--text);
+      border: 1px solid var(--border-mid); border-radius: 8px;
+      padding: 0.75rem 1rem; font-size: 0.9rem; font-family: inherit;
+      outline: none; transition: border-color 0.15s;
+    }
+    .waitlist-input:focus { border-color: var(--accent); }
+    .waitlist-input::placeholder { color: var(--text-dim); }
+    select.waitlist-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%234a5568' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.85rem center; padding-right: 2rem; }
+    select.waitlist-input option { background: #111318; }
+    .waitlist-note { margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-dim); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border); padding: 2.5rem 2rem;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 1rem;
+    }
+    .footer-left { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-dim); }
+    .footer-links { display: flex; gap: 1.5rem; list-style: none; }
+    .footer-links a { font-size: 0.8rem; color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+    .footer-links a:hover { color: var(--text-muted); }
+
+    @media (max-width: 640px) {
+      nav { padding: 0 1rem; }
+      .nav-links { display: none; }
+      .hero, section { padding: 5rem 1.25rem 4rem; }
+      .step-connector { display: none; }
+      .team-box { flex-direction: column; }
+      .waitlist-form-row { flex-direction: column; }
+      .screenshot-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ═══════════════════════════════════════
+       ANIMATIONS
+       All wrapped in prefers-reduced-motion
+    ═══════════════════════════════════════ */
+
+    /* 1 — Scroll entrance: fade + lift */
+    .reveal {
+      opacity: 0;
+      transform: translateY(22px);
+      will-change: opacity, transform;
+      transition: opacity 0.55s cubic-bezier(0.22,1,0.36,1),
+                  transform 0.55s cubic-bezier(0.22,1,0.36,1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* 2 — Card hover glow */
+    .cap-card, .uc-card, .obj-card, .screenshot-card, .team-box {
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    }
+    .cap-card:hover, .uc-card:hover, .obj-card:hover {
+      border-color: rgba(79,142,247,0.3);
+      box-shadow: 0 0 0 1px rgba(79,142,247,0.15), 0 8px 32px rgba(79,142,247,0.08);
+      transform: translateY(-2px);
+    }
+    .screenshot-card:hover {
+      border-color: rgba(79,142,247,0.3);
+      box-shadow: 0 0 0 1px rgba(79,142,247,0.15), 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    /* 3 — Hero headline word stagger */
+    .hero h1 .word {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(16px);
+      animation: word-rise 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
+    }
+    @keyframes word-rise {
+      to { opacity: 1; transform: none; }
+    }
+
+    /* 5 — Nav subtle shadow on scroll */
+    nav { transition: box-shadow 0.3s, border-color 0.3s; }
+    nav.scrolled {
+      box-shadow: 0 1px 24px rgba(0,0,0,0.5);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    /* 6 — CTA shimmer */
+    .btn-primary {
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-primary::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+      transform: skewX(-20deg);
+      animation: shimmer 3s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%   { left: -100%; }
+      40%  { left: 150%; }
+      100% { left: 150%; }
+    }
+
+    /* 7 — FAQ accordion smooth (already has max-height — add easing) */
+    .faq-answer {
+      transition: max-height 0.35s cubic-bezier(0.22,1,0.36,1),
+                  padding 0.25s ease,
+                  opacity 0.3s ease;
+      opacity: 0;
+    }
+    .faq-item.open .faq-answer {
+      opacity: 1;
+    }
+
+    /* 8 — Ambient hero background drift */
+    .hero::after {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 50% 40% at 20% 60%, rgba(79,142,247,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 35% at 80% 30%, rgba(52,211,153,0.04) 0%, transparent 60%);
+      animation: hero-drift 12s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes hero-drift {
+      0%   { transform: scale(1) translate(0, 0); }
+      100% { transform: scale(1.08) translate(-2%, 2%); }
+    }
+
+    /* nav-logo-emoji subtle pulse */
+    .nav-logo-emoji {
+      animation: dot-pulse 3s ease-in-out infinite;
+    }
+    @keyframes dot-pulse {
+      0%,100% { box-shadow: 0 0 6px var(--accent-glow); }
+      50%     { box-shadow: 0 0 14px var(--accent-glow), 0 0 28px rgba(79,142,247,0.15); }
+    }
+
+    /* App frame entrance glow */
+    .app-frame {
+      animation: frame-appear 0.8s cubic-bezier(0.22,1,0.36,1) 0.3s both;
+    }
+    @keyframes frame-appear {
+      from { opacity: 0; transform: translateY(32px) scale(0.98); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* Hero badge entrance */
+    .hero-badge {
+      animation: badge-drop 0.5s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    @keyframes badge-drop {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* Hero sub + CTA fade in */
+    .hero-sub  { animation: fade-up 0.6s cubic-bezier(0.22,1,0.36,1) 0.5s both; }
+    .hero-actions { animation: fade-up 0.6s cubic-bezier(0.22,1,0.36,1) 0.65s both; }
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* Step cards stagger */
+    .step:nth-child(1) { animation-delay: 0s; }
+    .step:nth-child(2) { animation-delay: 0.08s; }
+    .step:nth-child(3) { animation-delay: 0.16s; }
+    .step:nth-child(4) { animation-delay: 0.24s; }
+
+    /* Waitlist counter bounce-in */
+    .waitlist-counter {
+      animation: counter-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.2s both;
+    }
+    @keyframes counter-pop {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ── Respect reduced motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      .reveal, .hero h1 .word, .hero-badge, .hero-sub, .hero-actions,
+      .app-frame, .waitlist-counter {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+      .btn-primary::after { display: none; }
+      .hero::after { animation: none; }
+      .nav-logo-emoji { animation: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <span class="nav-logo-emoji">⚗️</span>
+    ProcessLM
+  </a>
+  <ul class="nav-links">
+    <li><a href="#how-it-works">How it works</a></li>
+    <li><a href="#demo">Demo</a></li>
+    <li><a href="#capabilities">Capabilities</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="#" class="nav-cta plm-waitlist-trigger">Join waitlist</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    ⚗️ Hybrid Modeling Infrastructure · Private Alpha
+  </div>
+
+  <h1>
+    From process description to<br />
+    <em>optimized protocol</em> —<br />
+    in a single conversation.
+  </h1>
+
+  <p class="hero-sub">
+    Describe your system in plain language. ProcessLM builds the mechanistic model,
+    fits it to your experimental data, and identifies the operating conditions
+    that maximize your target outcome.
+  </p>
+
+  <div class="hero-actions">
+    <a href="#" class="btn-primary plm-waitlist-trigger">
+      Join waitlist
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7.5 3.5L11 7l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a href="#how-it-works" class="btn-secondary">See how it works</a>
+  </div>
+
+  <!-- Product demo GIF -->
+  <div class="app-frame">
+    <div class="app-frame-bar">
+      <div class="traffic-light">
+        <div class="tl tl-r"></div><div class="tl tl-y"></div><div class="tl tl-g"></div>
+      </div>
+      <span class="app-frame-label">ProcessLM — CHO Cell Culture · Fed-batch simulation</span>
+    </div>
+    <img src="assets/product_demo.gif" alt="ProcessLM demo — model generation, equations, YAML, and simulation charts" loading="eager" />
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="section-inner">
+    <div class="section-label">How it works</div>
+    <h2 class="section-title">Model → Calibrate → Optimize.<br />All in one conversation.</h2>
+    <p class="section-sub">ProcessLM collapses the design-build-test-learn loop into a conversational workflow. No modeling expertise required.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-icon">💬</div>
+        <h3>Describe your system</h3>
+        <p>Explain your process in plain language — states, inputs, known physics, and what you want to achieve.</p>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-icon">🧮</div>
+        <h3>Get a mechanistic model</h3>
+        <p>ProcessLM generates a validated ODE model with transparent equations you can inspect, edit, and export.</p>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-icon">📊</div>
+        <h3>Calibrate to your data</h3>
+        <p>Upload experimental measurements. The model is automatically fitted and validated against your data.</p>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-icon">🎯</div>
+        <h3>Optimize the protocol</h3>
+        <p>Define your objective. ProcessLM finds the operating conditions that maximize your target outcome.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCT IN ACTION -->
+<section id="demo">
+  <div class="section-inner">
+    <div class="section-label">Product in action</div>
+    <h2 class="section-title">Real models. Real results.</h2>
+    <p class="section-sub">Every model ProcessLM generates is mathematically rigorous — transparent equations, validated calibration, and optimizable protocol. Here's what a CHO cell culture session looks like.</p>
+
+    <!-- Screenshot grid -->
+    <div class="screenshot-grid">
+      <div class="screenshot-card">
+        <img src="assets/05_model_ready.png" alt="Simulation results with charts" loading="lazy" />
+        <div class="screenshot-caption">
+          <strong>Simulation results</strong> — multi-state trajectories with Plotly charts
+        </div>
+      </div>
+      <div class="screenshot-card">
+        <img src="assets/06_equations.png" alt="Model equations tab" loading="lazy" />
+        <div class="screenshot-caption">
+          <strong>Transparent equations</strong> — every ODE rendered in full, editable at any time
+        </div>
+      </div>
+      <div class="screenshot-card">
+        <img src="assets/07_yaml.png" alt="YAML model definition" loading="lazy" />
+        <div class="screenshot-caption">
+          <strong>Exportable YAML</strong> — structured model definition you can version and share
+        </div>
+      </div>
+      <div class="screenshot-card">
+        <img src="assets/11_metrics.png" alt="Calibration metrics" loading="lazy" />
+        <div class="screenshot-caption">
+          <strong>Calibration metrics</strong> — R², RMSE, MAE reported after every parameter fit
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section id="capabilities" class="capabilities">
+  <div class="section-inner">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Everything a modeling specialist does.<br />In a conversation.</h2>
+    <p class="section-sub">ProcessLM handles the full modeling stack — from equation generation to optimization — so your team can focus on the science.</p>
+    <div class="cap-grid">
+      <div class="cap-card">
+        <div class="cap-card-icon blue">🧬</div>
+        <h3>Mechanistic model generation</h3>
+        <p>Automatically generates ODE-based mechanistic models from natural language. Equations are fully transparent and editable.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon green">📈</div>
+        <h3>Parameter calibration</h3>
+        <p>Upload experimental CSV data. ProcessLM fits model parameters using cross-validation and reports R², RMSE, and uncertainty bounds.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon amber">⚡</div>
+        <h3>Protocol optimization</h3>
+        <p>Define objectives and constraints in plain language. The optimizer finds feed rates, temperatures, or timing schedules that maximize your target.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon blue">🔬</div>
+        <h3>Simulation & prediction</h3>
+        <p>Run forward simulations over any time horizon. Explore what-if scenarios before committing to physical experiments.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon green">🗄️</div>
+        <h3>Model store</h3>
+        <p>Save, version, and reload calibrated models. Share across your team or build on previous experiments without starting from scratch.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon amber">📤</div>
+        <h3>Export & integration</h3>
+        <p>Export calibrated models as YAML. Drop them into your existing pipelines — ProcessLM works with your tools, not against them.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon blue">🧠</div>
+        <h3>State-of-the-art training algorithms</h3>
+        <p>Fit hybrid models using Neural ODEs, Physics-Informed Neural Networks (PINNs), Bayesian inference, and classical ODE solvers — the right algorithm for your data and system complexity.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon green">🤖</div>
+        <h3>Autonomous model improvement</h3>
+        <p>LLM agents continuously analyze simulation results, identify structural weaknesses — missing dynamics, poor fit regions, unmodeled interactions — and autonomously propose and apply architectural changes to improve accuracy.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OBJECTION HANDLING -->
+<section class="objections">
+  <div class="section-inner">
+    <div class="section-label">Built for trust</div>
+    <h2 class="section-title">Your questions, answered upfront.</h2>
+    <div class="obj-grid">
+      <div class="obj-card">
+        <div class="obj-icon">🔍</div>
+        <div>
+          <h4>Will the equations be correct?</h4>
+          <p>Every equation is visible, editable, and exportable. ProcessLM shows its work — you're always in control of the model structure and can override anything.</p>
+        </div>
+      </div>
+      <div class="obj-card">
+        <div class="obj-icon">🔗</div>
+        <div>
+          <h4>What about my existing tools?</h4>
+          <p>ProcessLM exports to YAML — drop it straight into your existing pipeline. It's an addition to your workflow, not a replacement.</p>
+        </div>
+      </div>
+      <div class="obj-card">
+        <div class="obj-icon">📐</div>
+        <div>
+          <h4>Do I need a modeling background?</h4>
+          <p>No. ProcessLM is designed for scientists who understand their biology or chemistry but don't want to hand-code ODEs. If you can describe your system, ProcessLM can model it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROOF BAR -->
+<div class="proof-bar">
+  <p>Built for scientists and engineers in</p>
+  <div class="proof-logos">
+    <span class="proof-logo">Bioprocess</span>
+    <span class="proof-logo">Chemical Engineering</span>
+    <span class="proof-logo">Pharma R&D</span>
+    <span class="proof-logo">Environmental Systems</span>
+    <span class="proof-logo">Food & Fermentation</span>
+  </div>
+</div>
+
+<!-- USE CASES -->
+<section id="use-cases" style="display:none">
+  <div class="section-inner">
+    <div class="section-label">Use cases</div>
+    <h2 class="section-title">Any dynamic system.<br />Any domain.</h2>
+    <p class="section-sub">If your system evolves over time and you want to understand, predict, or improve it, ProcessLM is built for you.</p>
+    <div class="use-case-grid">
+      <a href="bioprocess.html" class="uc-card" style="text-decoration: none; color: inherit;">
+        <span class="uc-tag">Bioprocess</span>
+        <h3>Fed-batch bioreactor parameter estimation</h3>
+        <p>Calibrate Monod growth kinetics, substrate uptake, and product formation from sparse bioreactor measurements. Estimate 14 kinetic parameters using nonlinear least squares and EKF.</p>
+      </a>
+      <a href="batteries.html" class="uc-card" style="text-decoration: none; color: inherit;">
+        <span class="uc-tag">Battery Systems</span>
+        <h3>Lithium-ion battery health monitoring</h3>
+        <p>Estimate diffusion coefficients, internal resistance, and capacity fade from voltage/current/temperature data. Enable fast-charging optimization and predictive maintenance.</p>
+      </a>
+      <a href="chemical-process.html" class="uc-card" style="text-decoration: none; color: inherit;">
+        <span class="uc-tag">Chemical Engineering</span>
+        <h3>Distillation column soft sensing</h3>
+        <p>Estimate tray efficiencies and composition profiles from temperature measurements. Moving horizon estimation provides real-time soft sensors without lab delays.</p>
+      </a>
+      <a href="power-systems.html" class="uc-card" style="text-decoration: none; color: inherit;">
+        <span class="uc-tag">Power Systems</span>
+        <h3>Distribution grid state estimation</h3>
+        <p>Reconstruct voltage profiles and line parameters from sparse SCADA/AMI/PMU data. Enable volt-var optimization and hosting capacity analysis for DER integration.</p>
+      </a>
+      <a href="robotics.html" class="uc-card" style="text-decoration: none; color: inherit;">
+        <span class="uc-tag">Robotics</span>
+        <h3>Robot manipulator parameter identification</h3>
+        <p>Estimate inertial parameters, friction coefficients, and payload properties from joint trajectories. Improve tracking accuracy by 40–60% for high-speed pick-and-place.</p>
+      </a>
+      <a href="pkpd.html" class="uc-card" style="text-decoration: none; color: inherit;">
+        <span class="uc-tag">Pharmacology</span>
+        <h3>PK/PD modeling for precision dosing</h3>
+        <p>Estimate patient-specific clearance, volume, and drug sensitivity from sparse clinical data. Bayesian estimation enables individualized dosing for narrow-window therapeutics.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- TEAM -->
+<section class="team-section" style="padding:5rem 2rem;">
+  <div class="section-inner" style="max-width:680px;margin:0 auto;text-align:center;">
+    <div class="section-label" style="justify-content:center;display:flex;">Built by</div>
+    <img src="assets/algocell_logo.png" alt="Algocell"
+         style="height:72px;width:auto;display:block;margin:1.5rem auto 0;filter:brightness(0) invert(1);" />
+    <div style="width:40px;height:2px;background:var(--border-mid);margin:2rem auto;border-radius:2px;"></div>
+    <p style="font-size:1.05rem;color:var(--text);font-weight:500;line-height:1.5;margin-bottom:1rem;">
+      We build infrastructure for quantitative science.
+    </p>
+    <p style="font-size:0.9rem;color:var(--text-muted);line-height:1.75;">
+      Algocell was founded by scientists and engineers who spent years building
+      and calibrating mechanistic models by hand — in MATLAB, Python, and custom
+      simulation frameworks. ProcessLM is the tool we wished existed.
+      We're building it in the open with our first users.
+    </p>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="section-inner">
+    <div class="section-label">FAQ</div>
+    <h2 class="section-title">Common questions</h2>
+    <div class="faq-list">
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          What types of systems can ProcessLM model?
+          <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="faq-answer">
+          Any continuous dynamic system described by ordinary differential equations (ODEs) — fed-batch bioreactors, continuous stirred tank reactors, compartmental pharmacokinetic models, ecological systems, polymerization processes, and more. If your system has states that evolve over time according to known or learnable physics, ProcessLM can model it.
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          How accurate are the generated models?
+          <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="faq-answer">
+          Accuracy depends on the quality of your experimental data and the correctness of the underlying physics. ProcessLM generates mechanistic models (not black-box ML), so the structure is interpretable and physically grounded. After calibration, it reports R², RMSE, and MAE so you always know exactly how well the model fits your data. You can inspect every equation and override anything that doesn't match your domain knowledge.
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          What does alpha access include?
+          <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="faq-answer">
+          Alpha users get: full access to all features (model generation, calibration, optimization, model store), a 1:1 onboarding call with the Algocell team, direct input on the product roadmap and model schema, and $200 in tokens credit for free. Alpha cohorts are small by design — we work closely with early users to make sure the tool fits real workflows.
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          How is this different from gPROMS or MATLAB?
+          <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="faq-answer">
+          gPROMS and MATLAB are powerful but require significant expertise to operate — you need to write equations manually, manage numerical solvers, and script calibration routines. ProcessLM handles all of that from a plain-language description. It's not a replacement for expert modelers working on highly custom systems; it's a way for scientists without modeling backgrounds to build, calibrate, and optimize mechanistic models without a specialist on staff — and for expert modelers to move much faster on routine work.
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          Can I use my own experimental data for calibration?
+          <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="faq-answer">
+          Yes — that's a core part of the workflow. Upload your time-series measurements as CSV, tell ProcessLM which columns map to which model states, and the calibration engine fits your model parameters against your data using cross-validation. You get R², RMSE, and residual plots so you can see exactly how well the model captures your system's behavior. The better your experimental coverage, the more accurate the calibrated model.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WAITLIST -->
+<section id="waitlist" class="waitlist-section">
+  <div class="section-inner">
+    <div class="waitlist-box">
+      <div class="section-label">Early access</div>
+      <h2 class="section-title">Join the alpha</h2>
+      <p class="section-sub">ProcessLM is in private alpha. Spots are limited — we onboard in small cohorts to work closely with early users.</p>
+
+      <div class="waitlist-counter">
+        <span class="waitlist-counter-dot"></span>
+        80+ scientists already on the waitlist
+      </div>
+
+      <div class="alpha-benefits">
+        <div class="alpha-benefit">
+          <span class="alpha-benefit-check">✓</span>
+          <span>Full access to all features — model generation, calibration, optimization, model store</span>
+        </div>
+        <div class="alpha-benefit">
+          <span class="alpha-benefit-check">✓</span>
+          <span>1:1 onboarding call with the Algocell team</span>
+        </div>
+        <div class="alpha-benefit">
+          <span class="alpha-benefit-check">✓</span>
+          <span>Direct input on the product roadmap</span>
+        </div>
+        <div class="alpha-benefit">
+          <span class="alpha-benefit-check">✓</span>
+          <span>$200 tokens credit for free</span>
+        </div>
+      </div>
+
+      <button class="btn-primary plm-waitlist-trigger" style="width:100%;justify-content:center;">
+        Request alpha access
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7.5 3.5L11 7l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <p class="waitlist-note">Takes 2 minutes. No spam.</p>
+    </div>
+  </div>
+</section>
+
+<!-- WAITLIST MODAL -->
+<div id="plm-waitlist-modal" class="plm-modal-backdrop" role="dialog" aria-modal="true"
+     aria-labelledby="plm-modal-title" aria-describedby="plm-modal-desc" hidden>
+  <div class="plm-modal-container" role="document">
+
+    <button class="plm-modal-close" id="plm-modal-close-btn" aria-label="Close" type="button">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M1 1l14 14M15 1L1 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <div class="plm-modal-header">
+      <div class="plm-modal-badge">Alpha Cohort &mdash; Limited Seats</div>
+      <div style="font-size:2rem;margin:0.5rem 0">⚗️</div>
+      <h2 id="plm-modal-title" class="plm-modal-title">Apply for Early Access</h2>
+      <p id="plm-modal-desc" class="plm-modal-desc">
+        We're selecting a small first cohort of modelers to shape ProcessLM before public launch. Accepted members get direct access to the team, influence over the roadmap, and tools that aren't available anywhere else yet.
+      </p>
+    </div>
+
+    <form id="plm-waitlist-form" class="plm-form" novalidate autocomplete="on">
+      <!-- Honeypot -->
+      <input type="text" name="plm_hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;" />
+
+      <!-- 0: Email -->
+      <div class="plm-field">
+        <label class="plm-label" for="plm-email">Work email <span class="plm-req" aria-hidden="true">*</span></label>
+        <input type="email" id="plm-email" name="email" class="plm-input" placeholder="you@org.com" required autocomplete="email" />
+        <span class="plm-err" id="plm-email-err" role="alert" aria-live="polite"></span>
+      </div>
+
+      <!-- 1: Field of work -->
+      <div class="plm-field">
+        <label class="plm-label" for="plm-field">What field do you work in? <span class="plm-req" aria-hidden="true">*</span></label>
+        <div class="plm-sel-wrap">
+          <select id="plm-field" name="field" class="plm-select" required onchange="plmRevealOther(this,'plm-field-other')">
+            <option value="" disabled selected>Select…</option>
+            <option value="bioprocess">Bioprocess &amp; Fermentation</option>
+            <option value="pharma">Pharma &amp; Drug Development</option>
+            <option value="chemical">Chemical &amp; Reaction Engineering</option>
+            <option value="environmental">Environmental &amp; Ecological</option>
+            <option value="food_ag">Food &amp; Agricultural Science</option>
+            <option value="materials">Materials &amp; Polymer Science</option>
+            <option value="energy">Energy Systems</option>
+            <option value="academic">Academic Research</option>
+            <option value="other">Other</option>
+          </select>
+          <svg class="plm-chevron" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <input type="text" id="plm-field-other" name="field_other" class="plm-input plm-other-input" placeholder="Describe your field…" style="display:none;margin-top:0.5rem" />
+        <span class="plm-err" id="plm-field-err" role="alert" aria-live="polite"></span>
+      </div>
+
+      <!-- 2: Relationship to modeling -->
+      <div class="plm-field">
+        <label class="plm-label" for="plm-modeler-role">What best describes your relationship to modeling? <span class="plm-req" aria-hidden="true">*</span></label>
+        <div class="plm-sel-wrap">
+          <select id="plm-modeler-role" name="modeler_role" class="plm-select" required onchange="plmRevealOther(this,'plm-modeler-role-other')">
+            <option value="" disabled selected>Select…</option>
+            <option value="build_from_scratch">I build models from scratch</option>
+            <option value="use_adapt">I use or adapt existing models</option>
+            <option value="run_simulations">I run simulations</option>
+            <option value="oversee">I oversee modeling work</option>
+            <option value="learning">I'm learning / exploring</option>
+            <option value="other">Other</option>
+          </select>
+          <svg class="plm-chevron" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <input type="text" id="plm-modeler-role-other" name="modeler_role_other" class="plm-input plm-other-input" placeholder="Describe your role…" style="display:none;margin-top:0.5rem" />
+        <span class="plm-err" id="plm-modeler-role-err" role="alert" aria-live="polite"></span>
+      </div>
+
+      <!-- 3: Current tools (multi-select + Other) -->
+      <div class="plm-field">
+        <fieldset class="plm-fieldset">
+          <legend class="plm-label">What tools do you use for dynamic modeling? <span class="plm-hint">(optional, select all that apply)</span></legend>
+          <div class="plm-cb-grid">
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="python" class="plm-cb"><span class="plm-cb-box"></span>Python (scipy, casadi, etc.)</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="matlab" class="plm-cb"><span class="plm-cb-box"></span>MATLAB / Simulink</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="gproms" class="plm-cb"><span class="plm-cb-box"></span>gPROMS / Aspen</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="comsol" class="plm-cb"><span class="plm-cb-box"></span>COMSOL</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="r" class="plm-cb"><span class="plm-cb-box"></span>R</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="spreadsheets" class="plm-cb"><span class="plm-cb-box"></span>Spreadsheets</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="commercial" class="plm-cb"><span class="plm-cb-box"></span>Commercial domain-specific</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="none" class="plm-cb"><span class="plm-cb-box"></span>None yet</label>
+            <label class="plm-cb-label"><input type="checkbox" name="tools" value="other_tool" class="plm-cb" onchange="plmRevealOtherCb(this,'plm-tools-other')"><span class="plm-cb-box"></span>Other</label>
+          </div>
+          <input type="text" id="plm-tools-other" name="tools_other" class="plm-input plm-other-input" placeholder="Describe your tools…" style="display:none;margin-top:0.5rem" />
+        </fieldset>
+      </div>
+
+      <!-- 4: Hardest part of workflow -->
+      <div class="plm-field">
+        <label class="plm-label" for="plm-pain">What's the hardest part of your modeling workflow? <span class="plm-req" aria-hidden="true">*</span></label>
+        <div class="plm-sel-wrap">
+          <select id="plm-pain" name="pain" class="plm-select" required onchange="plmRevealOther(this,'plm-pain-other')">
+            <option value="" disabled selected>Select…</option>
+            <option value="building_structure">Building model structure</option>
+            <option value="fitting_params">Fitting parameters to data</option>
+            <option value="optimizing">Optimizing operating conditions</option>
+            <option value="connecting_experiments">Connecting models to experiments</option>
+            <option value="communicating">Communicating results to non-technical stakeholders</option>
+            <option value="version_control">Version control &amp; reproducibility</option>
+            <option value="other">Other</option>
+          </select>
+          <svg class="plm-chevron" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <input type="text" id="plm-pain-other" name="pain_other" class="plm-input plm-other-input" placeholder="Describe your challenge…" style="display:none;margin-top:0.5rem" />
+        <span class="plm-err" id="plm-pain-err" role="alert" aria-live="polite"></span>
+      </div>
+
+      <!-- 5: Frequency -->
+      <div class="plm-field">
+        <label class="plm-label" for="plm-frequency">How often do you work with dynamic models? <span class="plm-req" aria-hidden="true">*</span></label>
+        <div class="plm-sel-wrap">
+          <select id="plm-frequency" name="frequency" class="plm-select" required onchange="plmRevealOther(this,'plm-frequency-other')">
+            <option value="" disabled selected>Select…</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="occasionally">Occasionally</option>
+            <option value="not_yet">Not yet — this would be my first time</option>
+            <option value="other">Other</option>
+          </select>
+          <svg class="plm-chevron" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <input type="text" id="plm-frequency-other" name="frequency_other" class="plm-input plm-other-input" placeholder="Describe your usage…" style="display:none;margin-top:0.5rem" />
+        <span class="plm-err" id="plm-frequency-err" role="alert" aria-live="polite"></span>
+      </div>
+
+      <!-- 6: What would you use ProcessLM for -->
+      <div class="plm-field">
+        <label class="plm-label" for="plm-use-case">What would you use ProcessLM for? <span class="plm-req" aria-hidden="true">*</span></label>
+        <textarea id="plm-use-case" name="use_case" class="plm-input plm-textarea" placeholder="Describe your use case, the system you want to model, or what problem you're trying to solve…" required maxlength="500" rows="3" oninput="plmCharCount(this,'plm-use-case-count')"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.3rem">
+          <span class="plm-err" id="plm-use-case-err" role="alert" aria-live="polite"></span>
+          <span id="plm-use-case-count" style="font-size:0.75rem;color:var(--text-dim);margin-left:auto">0 / 500</span>
+        </div>
+      </div>
+
+      <div class="plm-form-footer">
+        <p class="plm-privacy">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><rect x="1" y="5" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 5V3.5a2.5 2.5 0 015 0V5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Your answers are used only to evaluate fit. We don't share your data.
+        </p>
+        <button type="submit" id="plm-submit-btn" class="btn-primary" style="width:100%;justify-content:center;margin-top:0.5rem">
+          Submit Application
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7.5 3.5L11 7l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </form>
+
+    <!-- Success -->
+    <div id="plm-success" class="plm-success-state" hidden aria-live="polite">
+      <div class="plm-success-icon">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><circle cx="22" cy="22" r="21" stroke="#34d399" stroke-width="2"/><path d="M13 22.5l6 6 12-12" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3 class="plm-success-title">Application received.</h3>
+      <p class="plm-success-body">We review applications on a rolling basis and reach out directly. If your work is a strong fit for this cohort, you'll hear from us.</p>
+      <button type="button" class="btn-secondary plm-success-close" style="margin-top:1.25rem">Close</button>
+    </div>
+
+  </div>
+</div>
+
+<style>
+/* ── Modal backdrop ── */
+.plm-modal-backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+.plm-modal-backdrop.plm-open {
+  opacity: 1; pointer-events: all;
+}
+/* Container */
+.plm-modal-container {
+  position: relative; width: 100%; max-width: 560px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto; overflow-x: hidden;
+  background: #0f1117; border: 1px solid #2a3347;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.75), 0 4px 16px rgba(0,0,0,0.4);
+  padding: 32px 32px 28px;
+  scrollbar-width: thin; scrollbar-color: #2a3347 transparent;
+  transform: translateY(20px) scale(0.97); opacity: 0;
+  transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1), opacity 0.22s ease;
+}
+.plm-modal-backdrop.plm-open .plm-modal-container {
+  transform: none; opacity: 1;
+}
+.plm-modal-container::-webkit-scrollbar { width: 4px; }
+.plm-modal-container::-webkit-scrollbar-thumb { background: #2a3347; border-radius: 4px; }
+/* Close */
+.plm-modal-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid #2a3347;
+  border-radius: 6px; color: #8b9ab8; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.plm-modal-close:hover { background: #1c2333; color: #f0f4ff; border-color: #4f7cff; }
+/* Header */
+.plm-modal-header { margin-bottom: 22px; padding-right: 28px; }
+.plm-modal-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: #4f8ef7; background: rgba(79,124,255,0.12);
+  border: 1px solid rgba(79,124,255,0.35);
+  border-radius: 20px; padding: 3px 10px; margin-bottom: 10px;
+}
+.plm-modal-title { font-size: 21px; font-weight: 700; color: #f0f4ff; line-height: 1.25; margin-bottom: 7px; letter-spacing: -0.02em; }
+.plm-modal-desc { font-size: 13.5px; color: #8b9ab8; line-height: 1.55; }
+/* Form */
+.plm-form { display: flex; flex-direction: column; gap: 18px; }
+.plm-field { display: flex; flex-direction: column; gap: 5px; }
+.plm-label { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: #f0f4ff; letter-spacing: 0.01em; }
+.plm-req { color: #4f8ef7; font-size: 13px; }
+.plm-hint { font-size: 11px; font-weight: 400; color: #5a6a8a; }
+/* Inputs */
+.plm-input {
+  width: 100%; background: #1c2333; border: 1px solid #2a3347;
+  border-radius: 6px; color: #f0f4ff;
+  font-size: 13.5px; font-family: inherit;
+  padding: 8px 11px; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none;
+}
+.plm-input::placeholder { color: #5a6a8a; }
+.plm-input:focus { border-color: #4f7cff; box-shadow: 0 0 0 3px rgba(79,124,255,0.2); }
+.plm-textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
+.plm-other-input { animation: plmFadeIn 0.18s ease; }
+@keyframes plmFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+/* Compound row */
+.plm-compound { display: flex; gap: 8px; }
+/* Select */
+.plm-sel-wrap { position: relative; display: flex; align-items: center; }
+.plm-select {
+  width: 100%; background: #1c2333; border: 1px solid #2a3347;
+  border-radius: 6px; color: #f0f4ff;
+  font-size: 13.5px; font-family: inherit;
+  padding: 8px 30px 8px 11px; outline: none; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.plm-select:focus { border-color: #4f7cff; box-shadow: 0 0 0 3px rgba(79,124,255,0.2); }
+.plm-select option { background: #1c2333; }
+.plm-select-sm { min-width: 152px; font-size: 12.5px; }
+.plm-chevron { position: absolute; right: 9px; pointer-events: none; color: #5a6a8a; }
+/* Fieldset */
+.plm-fieldset { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 7px; }
+/* Checkbox grid */
+.plm-cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.plm-cb-label {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12.5px; color: #8b9ab8; cursor: pointer;
+  padding: 5px 7px; border-radius: 6px; border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  user-select: none; line-height: 1.3;
+}
+.plm-cb-label:hover { background: rgba(79,124,255,0.06); border-color: rgba(79,124,255,0.15); color: #f0f4ff; }
+.plm-cb { display: none; }
+.plm-cb-box {
+  width: 15px; height: 15px; flex-shrink: 0;
+  border: 1.5px solid #2a3347; border-radius: 3px;
+  background: #1c2333; transition: background 0.12s, border-color 0.12s;
+  display: flex; align-items: center; justify-content: center;
+}
+.plm-cb:checked + .plm-cb-box {
+  background: #4f7cff; border-color: #4f7cff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M1.5 5.2l2.5 2.8 4.5-5' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center;
+}
+.plm-cb:checked ~ * { color: #f0f4ff; }
+/* Radio */
+.plm-radio-stack { display: flex; flex-direction: column; gap: 3px; }
+.plm-radio-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: #8b9ab8; cursor: pointer;
+  padding: 5px 7px; border-radius: 6px; border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  user-select: none;
+}
+.plm-radio-label:hover { background: rgba(79,124,255,0.06); border-color: rgba(79,124,255,0.15); color: #f0f4ff; }
+.plm-radio { display: none; }
+.plm-radio-dot {
+  width: 15px; height: 15px; flex-shrink: 0;
+  border: 1.5px solid #2a3347; border-radius: 50%;
+  background: #1c2333; transition: border-color 0.12s;
+  position: relative;
+}
+.plm-radio:checked + .plm-radio-dot { border-color: #4f7cff; }
+.plm-radio:checked + .plm-radio-dot::after {
+  content: ''; position: absolute; inset: 3px;
+  background: #4f7cff; border-radius: 50%;
+}
+/* Error */
+.plm-err { font-size: 11.5px; color: #f87171; min-height: 14px; }
+/* Footer */
+.plm-form-footer { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.plm-privacy { display: flex; align-items: flex-start; gap: 5px; font-size: 11.5px; color: #5a6a8a; line-height: 1.5; }
+/* Success */
+.plm-success-state { display: none; flex-direction: column; align-items: center; text-align: center; padding: 12px 0 8px; }
+.plm-success-state:not([hidden]) { display: flex; }
+.plm-success-icon { margin-bottom: 1rem; }
+.plm-success-title { font-size: 1.3rem; font-weight: 700; color: #f0f4ff; margin-bottom: 0.5rem; }
+.plm-success-body { font-size: 0.9rem; color: #8b9ab8; line-height: 1.6; max-width: 340px; }
+@media (max-width: 520px) {
+  .plm-modal-container { padding: 22px 18px 20px; }
+  .plm-cb-grid { grid-template-columns: 1fr; }
+  .plm-compound { flex-direction: column; }
+  .plm-select-sm { min-width: unset; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .plm-modal-backdrop, .plm-modal-container { transition: none !important; }
+}
+</style>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-left">
+    <span>⚗️ ProcessLM by <img src="assets/algocell_logo.png" alt="Algocell" style="height:16px;width:auto;vertical-align:middle;filter:brightness(0) invert(0.5);" /> · © 2026</span>
+  </div>
+  <ul class="footer-links">
+    <li><a href="#">Docs</a></li>
+    <li><a href="#">Privacy</a></li>
+    <li><a href="#">Terms</a></li>
+    <li><a href="mailto:hello@algocell.ai">Contact</a></li>
+  </ul>
+</footer>
+
+<script>
+  /* ── 1. Scroll reveal (IntersectionObserver) ── */
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll(
+    '.step, .cap-card, .uc-card, .obj-card, .screenshot-card, .team-box, .faq-item, .uc-card, .alpha-benefit'
+  ).forEach((el, i) => {
+    el.classList.add('reveal');
+    el.style.transitionDelay = `${(i % 4) * 0.07}s`;
+    revealObserver.observe(el);
+  });
+
+  /* ── 3. Hero headline word stagger ── */
+  (function() {
+    const h1 = document.querySelector('.hero h1');
+    if (!h1) return;
+    let wordIdx = 0;
+
+    function wrapNode(node) {
+      // If this node is an element (like <em>, <br>), animate the element as one unit
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.tagName === 'BR') return;
+        node.classList.add('word');
+        node.style.animationDelay = `${0.15 + wordIdx * 0.045}s`;
+        wordIdx++;
+        return;
+      }
+      // Text node — wrap each word individually
+      if (node.nodeType === Node.TEXT_NODE) {
+        const parts = node.textContent.split(/(\s+)/);
+        const frag = document.createDocumentFragment();
+        parts.forEach(part => {
+          if (/\S/.test(part)) {
+            const span = document.createElement('span');
+            span.className = 'word';
+            span.textContent = part;
+            span.style.animationDelay = `${0.15 + wordIdx * 0.045}s`;
+            wordIdx++;
+            frag.appendChild(span);
+          } else {
+            frag.appendChild(document.createTextNode(part));
+          }
+        });
+        node.parentNode.replaceChild(frag, node);
+      }
+    }
+
+    // Collect direct children of h1 to iterate (childNodes list mutates)
+    const children = [...h1.childNodes];
+    children.forEach(wrapNode);
+  })();
+
+  /* ── 5. Nav shadow on scroll ── */
+  const nav = document.querySelector('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 20);
+  }, { passive: true });
+
+  /* ── FAQ accordion ── */
+  function toggleFaq(btn) {
+    const item = btn.closest('.faq-item');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(el => el.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  }
+
+  /* ── Waitlist Modal ── */
+  const modal     = document.getElementById('plm-waitlist-modal');
+  const modalForm = document.getElementById('plm-waitlist-form');
+  const successEl = document.getElementById('plm-success');
+  let lastFocus   = null;
+
+  function openModal() {
+    lastFocus = document.activeElement;
+    modal.removeAttribute('hidden');
+    requestAnimationFrame(() => modal.classList.add('plm-open'));
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.plm-modal-close').focus();
+  }
+  function closeModal() {
+    modal.classList.remove('plm-open');
+    modal.addEventListener('transitionend', () => {
+      modal.setAttribute('hidden', '');
+      document.body.style.overflow = '';
+      if (lastFocus) lastFocus.focus();
+    }, { once: true });
+  }
+
+  // Open on any trigger
+  document.querySelectorAll('.plm-waitlist-trigger').forEach(el =>
+    el.addEventListener('click', e => { e.preventDefault(); openModal(); })
+  );
+  // Close on X button, backdrop click, Escape
+  document.getElementById('plm-modal-close-btn').addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.classList.contains('plm-open')) closeModal(); });
+  // Success close
+  document.querySelector('.plm-success-close')?.addEventListener('click', closeModal);
+
+  // Helper: reveal/hide "Other" text input for select fields
+  function plmRevealOther(sel, inputId) {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    inp.style.display = sel.value === 'other' ? 'block' : 'none';
+    if (sel.value !== 'other') inp.value = '';
+  }
+
+  // Helper: reveal/hide "Other" text input for checkbox
+  function plmRevealOtherCb(cb, inputId) {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    inp.style.display = cb.checked ? 'block' : 'none';
+    if (!cb.checked) inp.value = '';
+  }
+
+  // Helper: live character counter
+  function plmCharCount(el, countId) {
+    const counter = document.getElementById(countId);
+    if (counter) counter.textContent = el.value.length + ' / ' + el.maxLength;
+  }
+
+  // Form submission
+  modalForm.addEventListener('submit', e => {
+    e.preventDefault();
+    let valid = true;
+    const clearErr = id => { const el = document.getElementById(id); if (el) el.textContent = ''; };
+    const setErr   = (id, msg) => { const el = document.getElementById(id); if (el) { el.textContent = msg; valid = false; } };
+
+    clearErr('plm-email-err'); clearErr('plm-field-err'); clearErr('plm-modeler-role-err');
+    clearErr('plm-pain-err'); clearErr('plm-frequency-err'); clearErr('plm-use-case-err');
+
+    const email = document.getElementById('plm-email').value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) setErr('plm-email-err', 'Please enter a valid email.');
+    if (!document.getElementById('plm-field').value) setErr('plm-field-err', 'Please select your field.');
+    if (!document.getElementById('plm-modeler-role').value) setErr('plm-modeler-role-err', 'Please select an option.');
+    if (!document.getElementById('plm-pain').value) setErr('plm-pain-err', 'Please select an option.');
+    if (!document.getElementById('plm-frequency').value) setErr('plm-frequency-err', 'Please select an option.');
+    const useCase = document.getElementById('plm-use-case').value.trim();
+    if (!useCase) setErr('plm-use-case-err', 'Please tell us what you would use ProcessLM for.');
+    if (document.getElementById('plm_hp')?.value) return; // honeypot
+
+    if (!valid) return;
+
+    const btn = document.getElementById('plm-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="animation:spin 0.8s linear infinite"><circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="2" stroke-dasharray="32" stroke-dashoffset="10" stroke-linecap="round"/></svg>';
+
+    // Collect form data
+    const data = Object.fromEntries(new FormData(modalForm).entries());
+    data.tools = [...document.querySelectorAll('[name="tools"]:checked')].map(c => c.value);
+    console.log('Application submission:', data); // wire to backend
+
+    setTimeout(() => {
+      modalForm.hidden = true;
+      successEl.removeAttribute('hidden');
+    }, 800);
+  });
+
+  /* ── Invite gate ── */
+  (function() {
+    const VALID_PREFIX = 'ALG-PRLM-';
+
+    // If already unlocked this session, skip gate
+    if (sessionStorage.getItem('plm_access') === '1') return;
+
+    // Build gate overlay
+    const gate = document.createElement('div');
+    gate.id = 'plm-gate';
+    gate.innerHTML = `
+      <div id="plm-gate-box">
+        <img src="assets/algocell_logo.png" alt="Algocell" style="height:48px;width:auto;filter:brightness(0) invert(1);margin-bottom:2rem;" />
+        <h2 style="font-size:1.3rem;font-weight:700;color:#f0f2f5;margin-bottom:0.5rem;letter-spacing:-0.02em;">Private Alpha Access</h2>
+        <p style="font-size:0.875rem;color:#7a8394;margin-bottom:1.75rem;line-height:1.6;">Enter your invitation key to continue.</p>
+        <input id="plm-gate-input" type="text" placeholder="Enter Personal Code" autocomplete="off" spellcheck="false"
+               style="width:100%;background:#1c2333;border:1px solid #2a3347;border-radius:8px;color:#f0f2f5;
+                      font-size:1rem;font-family:inherit;padding:0.75rem 1rem;outline:none;text-align:center;
+                      letter-spacing:0.05em;transition:border-color 0.15s;" />
+        <p id="plm-gate-err" style="font-size:0.8rem;color:#f87171;min-height:1.2em;margin-top:0.5rem;"></p>
+        <button id="plm-gate-btn"
+                style="margin-top:0.75rem;width:100%;background:#4f8ef7;color:#fff;border:none;border-radius:8px;
+                       padding:0.75rem;font-size:0.95rem;font-weight:500;cursor:pointer;font-family:inherit;
+                       transition:opacity 0.15s;">
+          Enter
+        </button>
+      </div>`;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      #plm-gate {
+        position:fixed;inset:0;z-index:99999;
+        background:#0a0b0d;
+        display:flex;align-items:center;justify-content:center;padding:1.5rem;
+      }
+      #plm-gate-box {
+        width:100%;max-width:380px;text-align:center;
+        background:#111318;border:1px solid rgba(255,255,255,0.07);
+        border-radius:16px;padding:2.5rem 2rem;
+      }
+      #plm-gate-input:focus { border-color:#4f8ef7; }
+      #plm-gate-btn:hover { opacity:0.88; }
+      #plm-gate-btn:disabled { opacity:0.5;cursor:default; }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(gate);
+    document.body.style.overflow = 'hidden';
+
+    const input = document.getElementById('plm-gate-input');
+    const btn   = document.getElementById('plm-gate-btn');
+    const err   = document.getElementById('plm-gate-err');
+
+    function tryUnlock() {
+      const val = input.value.trim().toUpperCase();
+      if (val.startsWith(VALID_PREFIX) && val.length > VALID_PREFIX.length) {
+        sessionStorage.setItem('plm_access', '1');
+        gate.style.transition = 'opacity 0.4s ease';
+        gate.style.opacity = '0';
+        setTimeout(() => { gate.remove(); document.body.style.overflow = ''; }, 400);
+      } else {
+        err.textContent = 'Invalid key. Check your invitation and try again.';
+        input.style.borderColor = '#f87171';
+        setTimeout(() => { input.style.borderColor = ''; }, 1500);
+      }
+    }
+
+    btn.addEventListener('click', tryUnlock);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+    input.addEventListener('input', () => { err.textContent = ''; });
+  })();
+</script>
+
+</body>
+</html>

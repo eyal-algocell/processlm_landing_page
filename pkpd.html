@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PK/PD Parameter Estimation | ProcessLM Use Case</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚗️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0b0d;
+      --bg-card: #111318;
+      --bg-subtle: #16191f;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #f0f2f5;
+      --text-muted: #7a8394;
+      --text-dim: #4a5568;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --green: #34d399;
+      --code-bg: #0d1117;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    nav { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; transition: color 0.2s; }
+    nav a:hover { color: var(--accent); }
+    h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+    h2 { font-size: 1.75rem; font-weight: 600; margin: 3rem 0 1.5rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h3 { font-size: 1.3rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--text); }
+    p { margin-bottom: 1.25rem; color: var(--text-muted); }
+    .tag { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem; }
+    .equation {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      line-height: 2;
+      color: var(--text);
+    }
+    .equation .katex { font-size: 1.1em; }
+    .equation .katex-display { margin: 1em 0; }
+    .eq-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
+    .highlight { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 1.25rem 1.5rem; border-radius: 6px; margin: 1.5rem 0; }
+    .highlight strong { color: var(--accent); }
+    ul { margin: 1rem 0 1.5rem 1.5rem; color: var(--text-muted); }
+    ul li { margin-bottom: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg-subtle); color: var(--text); font-weight: 600; }
+    td { color: var(--text-muted); }
+    code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9rem; color: var(--green); }
+    .cta { display: inline-block; background: var(--accent); color: white; padding: 0.9rem 1.8rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 2rem; transition: opacity 0.2s; }
+    .cta:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to ProcessLM</a>
+  </nav>
+
+  <div class="container">
+    <span class="tag">Pharmacokinetics / Pharmacodynamics</span>
+    <h1>PK/PD Modeling for Individualized Dosing</h1>
+    <p><strong>Patient-specific parameter estimation from sparse clinical data for precision medicine</strong></p>
+
+    <h2>Introduction</h2>
+    <p>Pharmacokinetics (PK) describes what the body does to a drug—absorption, distribution, and elimination—while pharmacodynamics (PD) describes what the drug does to the body—efficacy and toxicity. Optimal dosing requires patient-specific parameter estimation to account for inter-individual variability in clearance, volume of distribution, and drug sensitivity.</p>
+
+    <p>The challenge: clinical data are sparse (3–5 blood samples over days/weeks), irregular (missed appointments), and noisy (assay variability ±10–20%). How do we estimate patient-specific PK/PD parameters to guide dose adjustments, predict exposure, and personalize therapy?</p>
+
+    <div class="highlight">
+      <strong>Why this matters:</strong> Individualized dosing improves efficacy (target attainment rate increases 30–50%), reduces toxicity (adverse events decrease 20–40%), and enables therapeutic drug monitoring (TDM) for narrow-window drugs like immunosuppressants, chemotherapy, and antibiotics—improving patient outcomes and reducing healthcare costs.
+    </div>
+
+    <h2>Pharmacological Science</h2>
+    <p>Drug disposition follows <strong>ADME principles</strong> (Absorption, Distribution, Metabolism, Excretion):</p>
+
+    <ul>
+      <li><strong>Absorption:</strong> Oral drugs enter systemic circulation via gut absorption (first-order kinetics with lag time)</li>
+      <li><strong>Distribution:</strong> Drug distributes between plasma (central compartment) and tissues (peripheral compartments) based on perfusion and partition coefficients</li>
+      <li><strong>Clearance:</strong> Hepatic metabolism (CYP enzymes) and renal excretion remove drug at rate CL·C (first-order elimination)</li>
+      <li><strong>Exposure-response:</strong> Plasma concentration C drives pharmacological effect via Emax models (sigmoidal dose-response)</li>
+      <li><strong>Biomarker dynamics:</strong> Efficacy (tumor size, inflammation markers) and toxicity (QTc prolongation, neutropenia) evolve over hours to weeks</li>
+    </ul>
+
+    <h2>Compartmental Model: Two-Compartment PK with Indirect-Response PD</h2>
+    <p>We use a mechanistic <strong>two-compartment model</strong> coupled to an <strong>indirect-response PD model</strong>:</p>
+
+    <div class="equation">
+<span class="eq-label">States:</span>
+$$\begin{aligned}
+A_g &= \text{drug amount in gut (absorption depot) [mg]} \\
+A_c &= \text{drug amount in central compartment (plasma) [mg]} \\
+A_p &= \text{drug amount in peripheral compartment (tissues) [mg]} \\
+E &= \text{pharmacodynamic effect (biomarker) [units]}
+\end{aligned}$$
+
+<span class="eq-label">ODEs (PK):</span>
+$$\begin{aligned}
+\frac{dA_g}{dt} &= -k_a \cdot A_g \quad \text{[absorption]} \\
+\frac{dA_c}{dt} &= k_a \cdot A_g - \frac{CL}{V_c} \cdot A_c - Q \cdot \left(\frac{A_c}{V_c} - \frac{A_p}{V_p}\right) \quad \text{[distribution + elimination]} \\
+\frac{dA_p}{dt} &= Q \cdot \left(\frac{A_c}{V_c} - \frac{A_p}{V_p}\right) \quad \text{[peripheral equilibration]} \\[0.5em]
+C &= \frac{A_c}{V_c} \quad \text{[plasma concentration, mg/L]}
+\end{aligned}$$
+
+<span class="eq-label">ODE (PD - indirect response model):</span>
+$$\frac{dE}{dt} = k_{\text{in}} \cdot \left(1 - \frac{I_{\max} \cdot C}{IC_{50} + C}\right) - k_{\text{out}} \cdot E$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+k_{\text{in}} &= \text{baseline production rate of biomarker} \\
+k_{\text{out}} &= \text{elimination rate of biomarker } (E_0 = k_{\text{in}}/k_{\text{out}} \text{ at baseline)} \\
+I_{\max} &= \text{maximum inhibition } (0 < I_{\max} \leq 1) \\
+IC_{50} &= \text{concentration for 50\% inhibition}
+\end{aligned}$$
+
+<span class="eq-label">Alternative PD models:</span>
+$$\begin{aligned}
+\text{Emax (stimulation): } & \frac{dE}{dt} = k_{\text{in}} \cdot \left(1 + \frac{E_{\max} \cdot C}{EC_{50}+C}\right) - k_{\text{out}} \cdot E \\
+\text{Tumor growth: } & \frac{d\text{Tumor}}{dt} = \lambda \cdot \text{Tumor} \cdot \left(1 - \frac{\text{Tumor}}{T_{\max}}\right) - k_{\text{kill}} \cdot C \cdot \text{Tumor} \\
+\text{Toxicity: } & \text{Exponential damage accumulation with recovery delay}
+\end{aligned}$$
+    </div>
+
+    <h3>Unknown Parameters (10 typical)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+          <th>Units</th>
+          <th>Inter-Patient CV</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>ka</td><td>Absorption rate constant</td><td>h⁻¹</td><td>30–60%</td></tr>
+        <tr><td>CL</td><td>Clearance</td><td>L/h</td><td>40–80% (age, renal function)</td></tr>
+        <tr><td>Vc</td><td>Central volume of distribution</td><td>L</td><td>20–40%</td></tr>
+        <tr><td>Vp, Q</td><td>Peripheral volume, inter-compartment flow</td><td>L, L/h</td><td>30–50%</td></tr>
+        <tr><td>F</td><td>Bioavailability (oral dosing)</td><td>—</td><td>20–50%</td></tr>
+        <tr><td>IC50</td><td>Drug potency</td><td>mg/L</td><td>50–100%</td></tr>
+        <tr><td>Imax</td><td>Maximum effect</td><td>—</td><td>20–40%</td></tr>
+        <tr><td>kin, kout</td><td>Biomarker production/elimination</td><td>units/h, h⁻¹</td><td>40–70%</td></tr>
+        <tr><td>E0</td><td>Baseline biomarker level</td><td>units</td><td>30–60%</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Parameter Estimation Challenge</h2>
+    <p>Given clinical data from a patient:</p>
+    <ul>
+      <li><strong>Dosing record:</strong> Time and amount of each dose (oral/IV) [precise]</li>
+      <li><strong>Sparse PK samples:</strong> Plasma concentration C at 3–5 time points (trough, peak, mid-dose) [±10–15% assay error, HPLC/LC-MS]</li>
+      <li><strong>Efficacy biomarker:</strong> Tumor size (RECIST), inflammation marker (CRP), viral load [weekly or biweekly measurements, ±10–30% variability]</li>
+      <li><strong>Toxicity marker:</strong> QTc interval, liver enzymes (ALT, AST), neutrophil count [weekly labs, variable compliance]</li>
+      <li><strong>Covariates:</strong> Weight, age, creatinine clearance, genotype (CYP2C19 polymorphism) [used to inform priors]</li>
+    </ul>
+
+    <p>The inverse problem uses <strong>nonlinear mixed-effects modeling</strong> (population PK/PD):</p>
+
+    <div class="equation">
+<span class="eq-label">Hierarchical Bayesian framework:</span>
+
+<span class="eq-label">Patient-level (individual $i$):</span>
+$$\begin{aligned}
+\theta_i &= [CL_i, V_{c,i}, k_{a,i}, IC_{50,i}, \ldots] \quad \text{[individual parameters]} \\
+\log(\theta_i) &\sim \mathcal{N}(\log(\theta_{\text{pop}}), \Omega) \quad \text{[log-normal distribution]} \\[0.5em]
+\theta_{\text{pop}} &= \text{population mean parameters} \\
+\Omega &= \text{inter-patient covariance matrix}
+\end{aligned}$$
+
+<span class="eq-label">Observations:</span>
+$$\begin{aligned}
+C_{ij} &= \frac{A_{c,i}(t_j)}{V_{c,i}} + \epsilon_{ij} \quad \text{[PK measurement } j \text{ for patient } i\text{]} \\
+\epsilon_{ij} &\sim \mathcal{N}(0, \sigma^2_{\text{PK}}) \quad \text{[proportional error model: } \sigma = 0.15 \cdot C\text{]} \\[0.5em]
+E_{ij} &= E(t_j; \theta_i) + \eta_{ij} \quad \text{[PD biomarker]} \\
+\eta_{ij} &\sim \mathcal{N}(0, \sigma^2_{\text{PD}})
+\end{aligned}$$
+
+<span class="eq-label">Maximum a posteriori (MAP) estimation:</span>
+$$\begin{aligned}
+\hat{\theta}_i &= \arg\max \left[ \log p(C_i, E_i \mid \theta_i) + \log p(\theta_i \mid \theta_{\text{pop}}, \Omega) \right] \\
+&= \arg\min \left[ \sum_j \frac{(C_{ij} - \hat{C}_{ij}(\theta_i))^2}{\sigma^2_{\text{PK}}} + \sum_j \frac{(E_{ij} - \hat{E}_{ij}(\theta_i))^2}{\sigma^2_{\text{PD}}} + (\theta_i - \theta_{\text{pop}})^T \Omega^{-1} (\theta_i - \theta_{\text{pop}}) \right]
+\end{aligned}$$
+    </div>
+
+    <div class="highlight">
+      <strong>Clinical interpretation:</strong> The prior (θpop, Ω from population study) regularizes individual estimates when data are sparse. After 1–2 samples, we get a rough estimate; after 4–5 samples, individual θᵢ converges within ±20% of true value (sufficient for dose adjustment).
+    </div>
+
+    <h2>Virtual Patient Simulation</h2>
+    <p>Generate synthetic clinical trial data:</p>
+    <ol>
+      <li><strong>Define population distribution:</strong>
+        <ul>
+          <li>CL ~ LogNormal(μ=5 L/h, σ=0.5) adjusted for renal function: CL = CLpop · (CrCL/100)^0.75</li>
+          <li>Vc ~ LogNormal(μ=40 L, σ=0.3) scaled by weight: Vc = Vcpop · (WT/70)^0.7</li>
+          <li>IC50 ~ LogNormal(μ=2 mg/L, σ=0.6) with genetic covariate (CYP2C19 poor metabolizers: IC50 ↑ 50%)</li>
+        </ul>
+      </li>
+      <li><strong>Sample 100 virtual patients:</strong> Draw θᵢ from population distributions</li>
+      <li><strong>Dosing protocol:</strong> Standard regimen (e.g., 400 mg BID oral for 28 days)</li>
+      <li><strong>Simulate ODEs:</strong> Forward integration with θᵢ to generate "true" C(t), E(t)</li>
+      <li><strong>Sparse sampling:</strong> Extract PK at t = [2h, 12h, 24h, 168h] post-dose; PD weekly</li>
+      <li><strong>Add noise:</strong> Proportional error (±15% for PK, ±20% for PD)</li>
+      <li><strong>Missed visits:</strong> Randomly drop 10–20% of samples (realistic adherence)</li>
+    </ol>
+
+    <h2>Estimation Workflow</h2>
+
+    <h3>1. Population Analysis (NONMEM, Monolix)</h3>
+    <p>First-stage: fit population parameters from Phase I/II data (50–200 patients)</p>
+    <ul>
+      <li>Estimate θpop, Ω using FOCE (first-order conditional estimation) or SAEM (stochastic approximation EM)</li>
+      <li>Covariate screening: test renal function, weight, age, genotype for CL/Vc</li>
+      <li>Validate with VPC (visual predictive checks), goodness-of-fit plots</li>
+    </ul>
+
+    <h3>2. Individual Bayesian Estimation (TDM)</h3>
+    <p>For new patient with 2–5 concentrations:</p>
+    <div class="equation">
+$$\begin{aligned}
+&\text{1. Initialize: } \hat{\theta}_i = \theta_{\text{pop}} \quad \text{[use population mean as prior]} \\
+&\text{2. Optimize: minimize objective function via L-BFGS-B} \\
+&\qquad \Rightarrow \hat{\theta}_i = [CL_i, V_{c,i}, k_{a,i}, IC_{50,i}, \ldots] \\
+&\text{3. Predict: simulate } C(t), E(t) \text{ for next 24–168 hours} \\
+&\text{4. Dose recommendation:} \\
+&\qquad \text{- Target: } AUC_{0-24} = 100 \text{ mg·h/L (efficacy threshold)} \\
+&\qquad \text{- Constraint: } C_{\max} < 15 \text{ mg/L (toxicity limit)} \\
+&\qquad \text{- Adjust dose: } D_{\text{new}} = D_{\text{old}} \cdot \frac{AUC_{\text{target}}}{AUC_{\text{predicted}}} \\
+&\text{5. Update after next measurement (iterative refinement)}
+\end{aligned}$$
+    </div>
+
+    <h3>3. Extended Kalman Filter (Real-Time Adaptive Dosing)</h3>
+    <p>For intensive care or oncology infusions:</p>
+    <ul>
+      <li>Augmented state: x = [Ag, Ac, Ap, E, CL, Vc]</li>
+      <li>Process noise: allows CL to drift due to organ dysfunction</li>
+      <li>Update EKF whenever new C or E measurement arrives</li>
+      <li>Adjust infusion rate in real-time based on predicted exposure</li>
+    </ul>
+
+    <h3>4. Markov Chain Monte Carlo (MCMC)</h3>
+    <p>For full posterior distribution and uncertainty quantification:</p>
+    <ul>
+      <li>Sample p(θᵢ | Cᵢ, Eᵢ, θpop, Ω) using Stan or PyMC</li>
+      <li>Obtain 95% credible intervals for dose recommendations</li>
+      <li>Useful for dose-finding in special populations (pediatrics, hepatic impairment)</li>
+    </ul>
+
+    <h2>Identifiability from Sparse Sampling</h2>
+    <p>Key insights from sensitivity analysis:</p>
+
+    <div class="highlight">
+      <strong>Minimum data requirements:</strong>
+      <ul>
+        <li><strong>Clearance CL:</strong> Requires ≥2 samples after steady-state (trough + one mid-dose)</li>
+        <li><strong>Volume Vc:</strong> Needs peak sample within 0.5–2h post-dose (distribution phase)</li>
+        <li><strong>Absorption ka:</strong> Oral dosing requires ≥3 samples in absorption phase (0.5h, 1h, 2h); IV dosing: ka not identifiable (not needed)</li>
+        <li><strong>IC50:</strong> Needs PD measurements spanning 0.2×IC50 to 5×IC50 (wide concentration range)</li>
+        <li><strong>Biomarker kinetics (kin, kout):</strong> Identifiable only if measurements span ≥2 half-lives of E (e.g., if t½ = 48h, need 4+ days of data)</li>
+      </ul>
+    </div>
+
+    <p><strong>Optimal sampling:</strong> D-optimal design maximizes det(Fisher Information Matrix). For two-compartment model, optimal times are typically: [0.5h, 2h, 6h, 24h] post-dose. Rich sampling (8–10 points) in Phase I reduces to sparse sampling (3–4 points) in TDM.</p>
+
+    <h2>Validation Strategy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Validation Test</th>
+          <th>Method</th>
+          <th>Acceptance Criterion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Parameter recovery</td>
+          <td>100 virtual patients, estimate θᵢ from sparse samples</td>
+          <td>Median bias < 15%, 90% CI coverage ≥ 85%</td></tr>
+        <tr>
+          <td>Exposure prediction</td>
+          <td>Predict AUC from 2 samples, compare to true AUC</td>
+          <td>MPE < 20%, R² > 0.80</td>
+        </tr>
+        <tr>
+          <td>Dose recommendation accuracy</td>
+          <td>Simulate recommended dose, check if target AUC achieved</td>
+          <td>80% of patients within 80–125% of target</td>
+        </tr>
+        <tr>
+          <td>Biomarker forecasting</td>
+          <td>Predict E at week 4 from weeks 1–2 data</td>
+          <td>RMSE < 30% of baseline range</td>
+        </tr>
+        <tr>
+          <td>Clinical trial simulation</td>
+          <td>Compare fixed-dose vs. TDM-guided in 500 virtual patients</td>
+          <td>TDM improves target attainment by ≥ 30%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Clinical Impact</h2>
+    <p>Patient-specific PK/PD modeling delivers measurable improvements:</p>
+    <ul>
+      <li><strong>Therapeutic drug monitoring (TDM):</strong> Individualized dosing for vancomycin, tacrolimus, and methotrexate reduces toxicity-related hospitalizations by 25–40% (cost savings: $5K–20K per prevented event)</li>
+      <li><strong>Oncology dose optimization:</strong> Model-informed precision dosing (MIPD) for targeted therapies increases progression-free survival by 2–4 months in metastatic cancer (HR 0.7–0.8)</li>
+      <li><strong>Pediatric dosing:</strong> Allometric scaling + Bayesian estimation enable first-cycle dose accuracy in children (reduces trial-and-error from 3–4 cycles to 1–2)</li>
+      <li><strong>Renal/hepatic impairment:</strong> PK models with organ-function covariates prevent under/overdosing in special populations (FDA guidance encourages model-based approaches)</li>
+      <li><strong>Drug-drug interaction prediction:</strong> Mechanistic PK models predict CYP inhibition effects, guiding combination therapy dosing</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Case study:</strong> A hospital implemented Bayesian TDM software for vancomycin across 500 patients. Target trough attainment (10–15 mg/L) increased from 45% to 78%, acute kidney injury rates dropped from 18% to 11%, and pharmacist time per patient decreased from 25 to 10 minutes. Annual savings: $1.2M in reduced toxicity and improved cure rates.
+    </div>
+
+    <h2>Try ProcessLM</h2>
+    <p>ProcessLM automates PK/PD workflows: describe your drug (oral/IV, one/two-compartment), upload clinical data (dosing + concentrations + biomarkers), and it fits population parameters, generates individual estimates, and recommends optimal doses—no NONMEM scripting or population PK expertise required.</p>
+
+    <a href="index.html#access" class="cta">Request Early Access</a>
+  </div>
+</body>
+</html>

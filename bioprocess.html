@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bioprocess Parameter Estimation | ProcessLM Use Case</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚗️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0b0d;
+      --bg-card: #111318;
+      --bg-subtle: #16191f;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #f0f2f5;
+      --text-muted: #7a8394;
+      --text-dim: #4a5568;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --green: #34d399;
+      --code-bg: #0d1117;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    nav { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; transition: color 0.2s; }
+    nav a:hover { color: var(--accent); }
+    h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+    h2 { font-size: 1.75rem; font-weight: 600; margin: 3rem 0 1.5rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h3 { font-size: 1.3rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--text); }
+    p { margin-bottom: 1.25rem; color: var(--text-muted); }
+    .tag { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem; }
+    .equation {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      line-height: 2;
+      color: var(--text);
+    }
+    .equation .katex { font-size: 1.1em; }
+    .equation .katex-display { margin: 1em 0; }
+    .eq-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
+    .highlight { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 1.25rem 1.5rem; border-radius: 6px; margin: 1.5rem 0; }
+    .highlight strong { color: var(--accent); }
+    ul { margin: 1rem 0 1.5rem 1.5rem; color: var(--text-muted); }
+    ul li { margin-bottom: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg-subtle); color: var(--text); font-weight: 600; }
+    td { color: var(--text-muted); }
+    code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9rem; color: var(--green); }
+    .cta { display: inline-block; background: var(--accent); color: white; padding: 0.9rem 1.8rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 2rem; transition: opacity 0.2s; }
+    .cta:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to ProcessLM</a>
+  </nav>
+
+  <div class="container">
+    <span class="tag">Bioprocess Engineering</span>
+    <h1>Fed-Batch Bioreactor Parameter Estimation</h1>
+    <p><strong>Mechanistic modeling and inverse-problem calibration for mammalian cell culture</strong></p>
+
+    <h2>Introduction</h2>
+    <p>Fed-batch bioreactors are the workhorse of biopharmaceutical manufacturing, producing monoclonal antibodies, therapeutic proteins, and vaccines in mammalian cell cultures such as CHO (Chinese Hamster Ovary) cells. Process development and optimization require accurate mathematical models to predict cell growth, substrate consumption, metabolite accumulation, and product formation under varying operating conditions.</p>
+
+    <p>The core challenge is <strong>parameter estimation</strong>: given sparse, noisy measurements from online sensors (pH, dissolved oxygen) and offline assays (cell counts, glucose, lactate, titer), how do we calibrate the unknown kinetic and stoichiometric parameters of a mechanistic ODE model?</p>
+
+    <div class="highlight">
+      <strong>Why this matters:</strong> Accurate parameter estimation enables digital twin modeling for scale-up prediction, feed strategy optimization, and real-time process monitoring—reducing experimental burden and accelerating drug development timelines in compliance with FDA PAT (Process Analytical Technology) guidance.
+    </div>
+
+    <h2>Science Background: Monod Kinetics and Mass Balance</h2>
+    <p>Mammalian cell growth in fed-batch culture follows <strong>Monod kinetics</strong> with dual substrate limitation (glucose and glutamine) and product inhibition (lactate and ammonia). The governing processes are:</p>
+
+    <ul>
+      <li><strong>Biomass growth:</strong> Specific growth rate μ depends on substrate availability and inhibitor concentrations via Monod and inhibition terms</li>
+      <li><strong>Substrate uptake:</strong> Glucose and glutamine are consumed for growth and maintenance</li>
+      <li><strong>Metabolite production:</strong> Lactate and ammonia accumulate as byproducts of metabolism</li>
+      <li><strong>Product formation:</strong> Monoclonal antibody (mAb) production follows Luedeking-Piret kinetics (growth-associated and non-growth-associated)</li>
+      <li><strong>Fed-batch dynamics:</strong> Nutrient feed addition increases reactor volume, causing dilution of all concentrations</li>
+    </ul>
+
+    <h2>Mathematical Model: ODE System</h2>
+    <p>The mechanistic model consists of 8 ordinary differential equations describing the temporal evolution of state variables:</p>
+
+    <div class="equation">
+<span class="eq-label">States:</span>
+$$\begin{aligned}
+X_v &= \text{viable biomass [g/L]} \\
+\text{Glc} &= \text{glucose [g/L]} \\
+\text{Gln} &= \text{glutamine [mM]} \\
+\text{Lac} &= \text{lactate [g/L]} \\
+\text{Amm} &= \text{ammonia [mM]} \\
+\text{mAb} &= \text{product titer [g/L]} \\
+V &= \text{reactor volume [L]}
+\end{aligned}$$
+
+<span class="eq-label">ODEs:</span>
+$$\begin{aligned}
+\frac{dX_v}{dt} &= \mu \cdot X_v - k_d \cdot X_v - D \cdot X_v \\
+\frac{d\text{Glc}}{dt} &= -q_{\text{Glc}} \cdot X_v - D \cdot (\text{Glc} - \text{Glc}_{\text{feed}}) \\
+\frac{d\text{Gln}}{dt} &= -q_{\text{Gln}} \cdot X_v - D \cdot (\text{Gln} - \text{Gln}_{\text{feed}}) \\
+\frac{d\text{Lac}}{dt} &= q_{\text{Lac}} \cdot X_v - D \cdot \text{Lac} \\
+\frac{d\text{Amm}}{dt} &= q_{\text{Amm}} \cdot X_v - D \cdot \text{Amm} \\
+\frac{d\text{mAb}}{dt} &= q_{\text{mAb}} \cdot X_v - D \cdot \text{mAb} \\
+\frac{dV}{dt} &= F(t)
+\end{aligned}$$
+
+<span class="eq-label">Specific rates:</span>
+$$\begin{aligned}
+\mu &= \mu_{\max} \cdot \frac{\text{Glc}}{K_{s,\text{Glc}}+\text{Glc}} \cdot \frac{\text{Gln}}{K_{s,\text{Gln}}+\text{Gln}} \cdot \frac{K_{i,\text{Lac}}}{K_{i,\text{Lac}}+\text{Lac}} \cdot \frac{K_{i,\text{Amm}}}{K_{i,\text{Amm}}+\text{Amm}} \\
+q_{\text{Glc}} &= \frac{\mu}{Y_{x/\text{Glc}}} + m_{\text{Glc}} \\
+q_{\text{Gln}} &= \frac{\mu}{Y_{x/\text{Gln}}} + m_{\text{Gln}} \\
+q_{\text{Lac}} &= \alpha_{\text{Lac}} \cdot \mu + \beta_{\text{Lac}} \\
+q_{\text{Amm}} &= \alpha_{\text{Amm}} \cdot q_{\text{Gln}} \\
+q_{\text{mAb}} &= \alpha_{\text{mAb}} \cdot \mu + \beta_{\text{mAb}} \\
+D &= \frac{F(t)}{V}
+\end{aligned}$$
+    </div>
+
+    <h3>Unknown Parameters (14 total)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+          <th>Units</th>
+          <th>Typical Range</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>μmax</td><td>Maximum specific growth rate</td><td>h⁻¹</td><td>0.02 – 0.05</td></tr>
+        <tr><td>KsGlc, KsGln</td><td>Monod saturation constants</td><td>g/L, mM</td><td>0.01 – 0.5</td></tr>
+        <tr><td>KiLac, KiAmm</td><td>Inhibition constants</td><td>g/L, mM</td><td>10 – 50</td></tr>
+        <tr><td>YxGlc, YxGln</td><td>Yield coefficients</td><td>g/g, g/mmol</td><td>0.1 – 0.5</td></tr>
+        <tr><td>mGlc, mGln</td><td>Maintenance coefficients</td><td>g/g/h, mmol/g/h</td><td>0.001 – 0.01</td></tr>
+        <tr><td>αLac, βLac</td><td>Lactate formation (Luedeking-Piret)</td><td>g/g, g/g/h</td><td>0.5 – 2.0</td></tr>
+        <tr><td>αmAb, βmAb</td><td>Product formation</td><td>mg/g, mg/g/h</td><td>1 – 10</td></tr>
+        <tr><td>kd</td><td>Death rate constant</td><td>h⁻¹</td><td>0.001 – 0.01</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Parameter Estimation Problem</h2>
+    <p>Given experimental measurements from a fed-batch run:</p>
+    <ul>
+      <li><strong>Online:</strong> pH, dissolved oxygen (DO), temperature, feed rate F(t) [continuous, 1-min resolution]</li>
+      <li><strong>Offline:</strong> Viable cell density (Vi-CELL), glucose/lactate (YSI), glutamine/ammonia (HPLC), mAb titer (Protein A) [sparse, 12-24 hr intervals]</li>
+    </ul>
+
+    <p>The inverse problem is formulated as <strong>nonlinear least squares</strong>:</p>
+
+    <div class="equation">
+<span class="eq-label">Minimize:</span>
+$$J(\theta) = \sum_{i} \left[ \frac{(y_{\text{obs},i} - y_{\text{model},i}(\theta))^2}{\sigma^2_i} \right]$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+\theta &= [\mu_{\max}, K_{s,\text{Glc}}, K_{s,\text{Gln}}, K_{i,\text{Lac}}, K_{i,\text{Amm}}, Y_{x/\text{Glc}}, Y_{x/\text{Gln}}, \ldots, k_d] \\
+y_{\text{obs}} &= \text{experimental measurements } [X_v, \text{Glc}, \text{Gln}, \text{Lac}, \text{Amm}, \text{mAb}] \\
+y_{\text{model}}(\theta) &= \text{model predictions from ODE integration} \\
+\sigma^2_i &= \text{measurement variance (assay noise)}
+\end{aligned}$$
+    </div>
+
+    <div class="highlight">
+      <strong>Maximum likelihood interpretation:</strong> Under Gaussian measurement noise, minimizing weighted least squares is equivalent to maximizing the likelihood function, yielding parameter estimates θ̂ and uncertainty quantification via the Fisher Information Matrix.
+    </div>
+
+    <h2>Simulation Framework</h2>
+    <p>To test estimation algorithms, we generate <strong>synthetic experimental data</strong>:</p>
+    <ol>
+      <li><strong>Define nominal parameters:</strong> Use literature values or pilot-scale data as ground truth</li>
+      <li><strong>Specify feed profile:</strong> Exponential or constant glucose/glutamine feed starting at t = 48–72 h</li>
+      <li><strong>Integrate ODEs:</strong> Forward simulation with ODE solver (LSODA, Radau) to generate "true" trajectories</li>
+      <li><strong>Add measurement noise:</strong>
+        <ul>
+          <li>Xv: ±5% coefficient of variation (CV)</li>
+          <li>Glc, Lac: ±3% CV (enzymatic assays)</li>
+          <li>Gln, Amm: ±5% CV (HPLC variability)</li>
+          <li>mAb: ±2% CV (Protein A accuracy)</li>
+        </ul>
+      </li>
+      <li><strong>Sparse sampling:</strong> Extract data at realistic time points (every 12–24 h, plus t=0)</li>
+    </ol>
+
+    <h2>Estimation Workflow</h2>
+    <h3>1. Nonlinear Least Squares (NLS)</h3>
+    <p>Use Levenberg-Marquardt or Trust-Region-Reflective optimization with:</p>
+    <ul>
+      <li><strong>Multi-start strategy:</strong> 50–100 random initializations to escape local minima</li>
+      <li><strong>Parameter bounds:</strong> Enforce physical constraints (μmax > 0, yields between 0–1)</li>
+      <li><strong>Log transformation:</strong> Optimize φ = log(θ) to maintain positivity</li>
+    </ul>
+
+    <h3>2. Extended Kalman Filter (EKF)</h3>
+    <p>For online state and parameter estimation:</p>
+    <div class="equation">
+$$\begin{aligned}
+\text{Augment state vector: } & x_{\text{aug}} = [X_v, \text{Glc}, \text{Gln}, \text{Lac}, \text{Amm}, \text{mAb}, V, \theta] \\[0.5em]
+\text{Prediction: } & \hat{x}_{k|k-1} = f(\hat{x}_{k-1|k-1}, u_k) \\[0.5em]
+\text{Update: } & \hat{x}_{k|k} = \hat{x}_{k|k-1} + K_k (y_k - h(\hat{x}_{k|k-1})) \\[0.5em]
+\text{Kalman gain: } & K_k = P_{k|k-1} H^T (H P_{k|k-1} H^T + R)^{-1} \\[1em]
+\text{Process noise } Q&: \text{ accounts for model mismatch} \\
+\text{Measurement noise } R&: \text{ assay covariance matrix}
+\end{aligned}$$
+    </div>
+
+    <h3>3. Unscented Kalman Filter (UKF)</h3>
+    <p>Superior for highly nonlinear systems—uses sigma-point propagation instead of linearization. Recommended for fed-batch models with strong substrate-growth coupling.</p>
+
+    <h2>Identifiability Analysis</h2>
+    <p>Not all 14 parameters can be uniquely estimated from the available data. Identifiability is assessed via:</p>
+
+    <div class="highlight">
+      <strong>Practical identifiability criteria:</strong>
+      <ul>
+        <li><strong>Fisher Information Matrix (FIM):</strong> Rank(FIM) = number of identifiable parameters; eigenvalues reveal ill-conditioning</li>
+        <li><strong>Parameter correlation matrix:</strong> Correlations > 0.85 indicate collinearity (e.g., μmax vs. KsGlc)</li>
+        <li><strong>Profile likelihood:</strong> Confidence intervals that extend to parameter bounds indicate non-identifiability</li>
+      </ul>
+    </div>
+
+    <p><strong>Recommendation:</strong> Fix maintenance coefficients (mGlc, mGln) and death rate (kd) from independent experiments. Estimate the 11 remaining parameters (growth, uptake yields, inhibition, product formation) from fed-batch data.</p>
+
+    <h2>Validation Strategy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Validation Test</th>
+          <th>Method</th>
+          <th>Acceptance Criterion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Parameter recovery</td>
+          <td>Synthetic data with known θ_true</td>
+          <td>|θ̂ - θ_true|/θ_true < 10%</td>
+        </tr>
+        <tr>
+          <td>Cross-validation</td>
+          <td>Fit on runs 1–3, validate on run 4</td>
+          <td>RMSE(Xv) < 0.5 g/L, RMSE(mAb) < 0.3 g/L</td>
+        </tr>
+        <tr>
+          <td>Prediction accuracy</td>
+          <td>Forecast final titer from t=72h data</td>
+          <td>Prediction error < 15%</td>
+        </tr>
+        <tr>
+          <td>Residual diagnostics</td>
+          <td>Durbin-Watson, Shapiro-Wilk tests</td>
+          <td>No autocorrelation, residuals normal</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Industrial Value</h2>
+    <p>Mechanistic parameter estimation delivers quantifiable ROI:</p>
+    <ul>
+      <li><strong>Scale-up confidence:</strong> Predict performance at 2000-L and 10,000-L scales from 5-L pilot data, reducing costly validation runs</li>
+      <li><strong>Feed optimization:</strong> Optimal glucose/glutamine feed profiles identified via model-based optimization increase final titer by 20–40%</li>
+      <li><strong>Process monitoring:</strong> Real-time EKF estimation enables early detection of deviations (contamination, low DO) before titer loss occurs</li>
+      <li><strong>Regulatory compliance:</strong> FDA PAT and ICH Q8/Q10 guidelines encourage mechanistic models as part of process understanding and control strategies</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Case study:</strong> A biopharmaceutical company reduced process development time by 6 months by replacing empirical DoE with mechanistic modeling and parameter estimation, accelerating a biosimilar program from IND to Phase I.
+    </div>
+
+    <h2>Try ProcessLM</h2>
+    <p>ProcessLM automates the entire workflow: you describe your fed-batch system in natural language, and it generates the ODE model, runs parameter estimation with cross-validation, and produces calibration reports—no MATLAB scripting required.</p>
+
+    <a href="index.html#access" class="cta">Request Early Access</a>
+  </div>
+</body>
+</html>

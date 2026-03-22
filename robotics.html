@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Robot Parameter Estimation | ProcessLM Use Case</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚗️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0b0d;
+      --bg-card: #111318;
+      --bg-subtle: #16191f;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #f0f2f5;
+      --text-muted: #7a8394;
+      --text-dim: #4a5568;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --green: #34d399;
+      --code-bg: #0d1117;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    nav { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; transition: color 0.2s; }
+    nav a:hover { color: var(--accent); }
+    h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+    h2 { font-size: 1.75rem; font-weight: 600; margin: 3rem 0 1.5rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h3 { font-size: 1.3rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--text); }
+    p { margin-bottom: 1.25rem; color: var(--text-muted); }
+    .tag { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem; }
+    .equation {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      line-height: 2;
+      color: var(--text);
+    }
+    .equation .katex { font-size: 1.1em; }
+    .equation .katex-display { margin: 1em 0; }
+    .eq-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
+    .highlight { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 1.25rem 1.5rem; border-radius: 6px; margin: 1.5rem 0; }
+    .highlight strong { color: var(--accent); }
+    ul { margin: 1rem 0 1.5rem 1.5rem; color: var(--text-muted); }
+    ul li { margin-bottom: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg-subtle); color: var(--text); font-weight: 600; }
+    td { color: var(--text-muted); }
+    code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9rem; color: var(--green); }
+    .cta { display: inline-block; background: var(--accent); color: white; padding: 0.9rem 1.8rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 2rem; transition: opacity 0.2s; }
+    .cta:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to ProcessLM</a>
+  </nav>
+
+  <div class="container">
+    <span class="tag">Robotics / Control</span>
+    <h1>Robot Manipulator Parameter Estimation</h1>
+    <p><strong>Inertial, friction, and payload parameter identification for high-accuracy control</strong></p>
+
+    <h2>Introduction</h2>
+    <p>Industrial robot manipulators (6-DOF arms) perform precision tasks in manufacturing, assembly, and surgery. Accurate trajectory tracking requires precise knowledge of dynamic parameters—link masses, inertias, friction coefficients, and payload properties—which vary due to tool changes, wear, and manufacturing tolerances.</p>
+
+    <p>The challenge: manufacturers provide nominal parameters, but real robots deviate by 10–30% due to assembly variations, cable routing, and unknown payloads (grippers, tools, parts). How do we identify these parameters from measured joint positions, velocities, and motor currents during test trajectories?</p>
+
+    <div class="highlight">
+      <strong>Why this matters:</strong> Accurate parameter estimation reduces tracking errors by 40–60%, eliminates retuning when tools change, and enables model-based control strategies (computed torque, adaptive control) that improve throughput and reduce cycle time by 10–20% in high-speed pick-and-place operations.
+    </div>
+
+    <h2>Rigid-Body Mechanics</h2>
+    <p>A serial manipulator with n revolute joints obeys the <strong>Euler-Lagrange equations</strong>:</p>
+
+    <ul>
+      <li><strong>Kinetic energy:</strong> T = ½ q̇ᵀ M(q) q̇, where M(q) is the n×n inertia matrix (configuration-dependent)</li>
+      <li><strong>Potential energy:</strong> U = Σ mᵢ g·rᵢ(q), gravity effects depend on link positions</li>
+      <li><strong>Coriolis and centrifugal forces:</strong> C(q, q̇) captures velocity-dependent coupling between joints</li>
+      <li><strong>Friction:</strong> Coulomb (sign-dependent), viscous (velocity-proportional), and Stribeck effects at low speeds</li>
+      <li><strong>Actuation:</strong> Motor torques τ transmitted through gearboxes with inertia and elasticity</li>
+    </ul>
+
+    <h2>Governing Dynamics: Manipulator Equations</h2>
+    <p>The equations of motion for a 6-DOF manipulator:</p>
+
+    <div class="equation">
+<span class="eq-label">State vector:</span>
+$$\begin{aligned}
+q &= [q_1, q_2, q_3, q_4, q_5, q_6]^T \quad \text{[joint angles, rad]} \\
+\dot{q} &= [\dot{q}_1, \dot{q}_2, \dot{q}_3, \dot{q}_4, \dot{q}_5, \dot{q}_6]^T \quad \text{[joint velocities, rad/s]}
+\end{aligned}$$
+
+<span class="eq-label">ODE:</span>
+$$M(q) \ddot{q} + C(q, \dot{q}) \dot{q} + g(q) + F(\dot{q}) = \tau$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+M(q) &= \text{inertia matrix (6}\times\text{6, symmetric, positive definite)} \\
+C(q, \dot{q}) &= \text{Coriolis/centrifugal matrix (6}\times\text{6)} \\
+g(q) &= \text{gravity torque vector (6}\times\text{1)} \\
+F(\dot{q}) &= \text{friction torque vector (6}\times\text{1)} \\
+\tau &= \text{motor torque vector (6}\times\text{1)}
+\end{aligned}$$
+
+<span class="eq-label">Inertia matrix structure:</span>
+$$M(q) = \sum_i \left[ m_i J_{v,i}^T J_{v,i} + J_{\omega,i}^T R_i I_i R_i^T J_{\omega,i} \right]$$
+
+$$\begin{aligned}
+m_i &= \text{mass of link } i \\
+I_i &= \text{inertia tensor of link } i \text{ (3}\times\text{3)} \\
+J_{v,i}, J_{\omega,i} &= \text{linear/angular velocity Jacobians}
+\end{aligned}$$
+
+<span class="eq-label">Friction model:</span>
+$$F_i(\dot{q}_i) = \underbrace{f_{c,i} \cdot \text{sign}(\dot{q}_i)}_{\text{Coulomb}} + \underbrace{f_{v,i} \cdot \dot{q}_i}_{\text{Viscous}} + \underbrace{f_{s,i} \cdot \exp(-|\dot{q}_i|/\dot{q}_s) \cdot \text{sign}(\dot{q}_i)}_{\text{Stribeck at low speed}}$$
+    </div>
+
+    <h3>Unknown Parameters (30+ for 6-DOF robot)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+          <th>Per Link</th>
+          <th>Typical Uncertainty</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>mᵢ</td><td>Link mass</td><td>6</td><td>±5–15%</td></tr>
+        <tr><td>rᵢ = [rx, ry, rz]</td><td>Center of mass position</td><td>18</td><td>±10–20 mm</td></tr>
+        <tr><td>Iᵢ = [Ixx, Iyy, Izz, Ixy, Ixz, Iyz]</td><td>Inertia tensor</td><td>36</td><td>±15–30%</td></tr>
+        <tr><td>fc,ᵢ</td><td>Coulomb friction</td><td>6</td><td>±20–50%</td></tr>
+        <tr><td>fᵥ,ᵢ</td><td>Viscous friction coefficient</td><td>6</td><td>±30–60%</td></tr>
+        <tr><td>mp, rp</td><td>Payload mass and position</td><td>4</td><td>Unknown (changes per task)</td></tr>
+        <tr><td>Im,ᵢ, kg,ᵢ</td><td>Motor inertia, gear ratio</td><td>12</td><td>±5% (datasheet errors)</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Parameter reduction:</strong> Not all 80+ parameters are identifiable. We use the <strong>base parameter set</strong> (lumped combinations like "inertial parameter products") reducing to 30–40 identifiable parameters via symbolic regression.</p>
+
+    <h2>Parameter Estimation Problem</h2>
+    <p>Given measurements from a robot test stand:</p>
+    <ul>
+      <li><strong>Joint encoders:</strong> Position q(t), velocity q̇(t) [1 kHz, ±0.001 rad resolution]</li>
+      <li><strong>Motor current:</strong> Measured current Iₘ(t) → torque τ(t) via kt·Iₘ [1 kHz, ±2% after calibration]</li>
+      <li><strong>Optional:</strong> Force/torque sensor at end-effector [300 Hz, ±0.5 N resolution]</li>
+    </ul>
+
+    <p>The inverse problem uses <strong>linear-in-parameters regression</strong> by rewriting dynamics:</p>
+
+    <div class="equation">
+<span class="eq-label">Regressor formulation:</span>
+$$\begin{aligned}
+\tau &= M(q) \ddot{q} + C(q, \dot{q}) \dot{q} + g(q) + F(\dot{q}) \\
+&= Y(q, \dot{q}, \ddot{q}) \cdot \pi
+\end{aligned}$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+Y(q, \dot{q}, \ddot{q}) &= \text{observation matrix (6}\times p \text{ per time step)} \\
+\pi &= \text{base parameter vector (}p\times\text{1, typically } p = 30\text{–40)}
+\end{aligned}$$
+
+$Y$ is constructed so dynamics are LINEAR in $\pi$:
+
+Example: $M_{11}(q) \ddot{q}_1 = [\ddot{q}_1 \cos^2(q_2) \mid \ddot{q}_1 \sin^2(q_2) \mid \ldots] \cdot [I_{zz,1} \mid m_2 L_1^2 \mid \ldots]$
+
+<span class="eq-label">Least squares solution:</span>
+$$\text{Minimize: } ||\tau_{\text{meas}} - Y \cdot \pi||^2$$
+
+<span class="eq-label">Stacking $K$ time samples:</span>
+$$\begin{aligned}
+Y_{\text{stacked}} &= [Y(t_1); Y(t_2); \ldots; Y(t_K)] \quad (6K \times p) \\
+\tau_{\text{stacked}} &= [\tau(t_1); \tau(t_2); \ldots; \tau(t_K)] \quad (6K \times 1)
+\end{aligned}$$
+
+<span class="eq-label">Closed-form:</span>
+$$\hat{\pi} = (Y^T Y)^{-1} Y^T \tau_{\text{stacked}}$$
+
+Condition number: $\kappa(Y^T Y)$ indicates excitation quality
+    </div>
+
+    <div class="highlight">
+      <strong>Identifiability key insight:</strong> Parameters are only identifiable if the trajectory "excites" them—e.g., joint 2 must accelerate at various angles q₂ to separate Izz,2 from m₃L₂². Optimal trajectories use finite Fourier series with carefully chosen frequencies.
+    </div>
+
+    <h2>Simulation Design</h2>
+    <p>Generate test trajectories for parameter estimation:</p>
+    <ol>
+      <li><strong>Exciting trajectory design:</strong>
+        <ul>
+          <li>Each joint follows: qᵢ(t) = Σ aᵢⱼ sin(ωⱼt + φᵢⱼ), where ωⱼ chosen to avoid resonances</li>
+          <li>Duration: 10–30 seconds per trajectory</li>
+          <li>Amplitude: qᵢ ∈ [qmin + 10°, qmax - 10°] to stay within workspace</li>
+          <li>Velocity limits: |q̇ᵢ| < 80% of max to avoid saturation</li>
+        </ul>
+      </li>
+      <li><strong>Forward dynamics simulation:</strong> Integrate M(q)q̈ = τ - C(q,q̇)q̇ - g(q) - F(q̇) with true parameters</li>
+      <li><strong>Add measurement noise:</strong> Position: ±0.001 rad, torque: ±0.5 Nm</li>
+      <li><strong>Numerical differentiation:</strong> Estimate q̈(t) from noisy q̇(t) using Savitzky-Golay filter (acceleration noise amplification is a major issue)</li>
+      <li><strong>Multi-payload tests:</strong> Repeat with 3–5 different payloads (0 kg, 2 kg, 5 kg, 10 kg) to improve mass/inertia identifiability</li>
+    </ol>
+
+    <h2>Estimation Methods</h2>
+
+    <h3>1. Weighted Least Squares (WLS)</h3>
+    <p>Closed-form solution with noise weighting:</p>
+    <ul>
+      <li>Weight matrix W: higher weight for high-torque samples (better signal-to-noise ratio)</li>
+      <li>Solution: π̂ = (YᵀWY)⁻¹ YᵀW τ</li>
+      <li>Regularization: Add λ||π - π_prior||² to prevent overfitting when κ(YᵀWY) > 1000</li>
+    </ul>
+
+    <h3>2. Recursive Least Squares (RLS)</h3>
+    <p>Online adaptation during robot operation:</p>
+    <div class="equation">
+<span class="eq-label">At each time step $k$:</span>
+$$\begin{aligned}
+&\text{1. Prediction error: } e_k = \tau_k - Y_k \hat{\pi}_{k-1} \\
+&\text{2. Gain update: } K_k = P_{k-1} Y_k^T (Y_k P_{k-1} Y_k^T + R)^{-1} \\
+&\text{3. Parameter update: } \hat{\pi}_k = \hat{\pi}_{k-1} + K_k e_k \\
+&\text{4. Covariance update: } P_k = (I - K_k Y_k) P_{k-1} \\[1em]
+&\text{Forgetting factor: Use } \lambda = 0.98\text{–}0.995 \text{ to track time-varying friction}
+\end{aligned}$$
+    </div>
+
+    <h3>3. Extended Kalman Filter (EKF)</h3>
+    <p>For joint state and parameter estimation:</p>
+    <ul>
+      <li>Augmented state: x = [q, q̇, π]</li>
+      <li>Handles nonlinear dynamics and non-Gaussian noise</li>
+      <li>Process noise Q models parameter drift (friction wear, temperature effects)</li>
+    </ul>
+
+    <h3>4. Moving Horizon Estimation (MHE)</h3>
+    <p>Constrained optimization over sliding window:</p>
+    <ul>
+      <li>Enforces physical constraints: mᵢ > 0, Iᵢ positive definite, friction monotonicity</li>
+      <li>Window size: 2–5 seconds (balance lag vs. computational cost)</li>
+      <li>Recommended for high-precision applications (surgical robotics)</li>
+    </ul>
+
+    <h2>Identifiability and Trajectory Optimization</h2>
+    <p>Key results from optimal experiment design:</p>
+
+    <div class="highlight">
+      <strong>Identifiability conditions:</strong>
+      <ul>
+        <li><strong>Mass parameters:</strong> Require vertical motion against gravity (separate mᵢ from Iᵢ)</li>
+        <li><strong>Inertia tensors:</strong> Need rotational acceleration at multiple configurations (Ixx vs. Iyy vs. Izz)</li>
+        <li><strong>Friction:</strong> Low-speed motion (< 10% max velocity) excites Coulomb term; high-speed excites viscous term</li>
+        <li><strong>Payload:</strong> Identifiable if end-effector undergoes large accelerations (> 2 m/s²)</li>
+        <li><strong>Coupling terms:</strong> Off-diagonal inertia (Ixy, Ixz, Iyz) require complex 3D motions (hardest to identify)</li>
+      </ul>
+    </div>
+
+    <p><strong>Trajectory optimization:</strong> Minimize condition number κ(YᵀY) or maximize minimum singular value σₘᵢₙ(Y). Genetic algorithms or gradient-based methods design Fourier coefficients. Typical result: optimized trajectories reduce parameter uncertainty by 50–70% vs. random motion.</p>
+
+    <h2>Validation Strategy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Validation Test</th>
+          <th>Method</th>
+          <th>Acceptance Criterion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Parameter recovery</td>
+          <td>Synthetic data with known π_true</td>
+          <td>|π̂ - π_true| / π_true < 15%</td>
+        </tr>
+        <tr>
+          <td>Torque prediction</td>
+          <td>Predict τ on hold-out trajectory</td>
+          <td>RMSE < 3% of max torque</td>
+        </tr>
+        <tr>
+          <td>Tracking performance</td>
+          <td>Computed-torque control with π̂ vs. π_nominal</td>
+          <td>Tracking error reduced by > 40%</td>
+        </tr>
+        <tr>
+          <td>Payload generalization</td>
+          <td>Identify with mp=5kg, test with mp=8kg</td>
+          <td>Torque prediction error < 5%</td>
+        </tr>
+        <tr>
+          <td>Repeatability</td>
+          <td>10 repeated identification experiments</td>
+          <td>σ(π̂) / mean(π̂) < 10%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Control Performance Impact</h2>
+    <p>Accurate parameter estimation enables advanced control:</p>
+    <ul>
+      <li><strong>Computed-torque control:</strong> Feedforward cancellation of M(q)q̈_des + C + g using π̂ reduces tracking error by 40–60% vs. PID alone</li>
+      <li><strong>Adaptive control:</strong> RLS parameter updates during operation handle tool changes without retuning (eliminates 30-minute setup per tool swap)</li>
+      <li><strong>Trajectory optimization:</strong> Accurate dynamics enable time-optimal motion planning (10–20% cycle time reduction in pick-and-place)</li>
+      <li><strong>Collision detection:</strong> Monitor residual τ_meas - τ_predicted to detect unexpected contact (safety-critical for collaborative robots)</li>
+      <li><strong>Payload identification:</strong> Automatically detect part mass/position (quality control in assembly lines)</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Case study:</strong> An automotive assembly line implemented online parameter estimation for 20 robot arms. Adaptive computed-torque control reduced tracking errors from 3.2 mm to 1.1 mm, eliminated weekly retuning (saving 40 hours/month of downtime), and increased throughput by 12% by enabling more aggressive trajectories within accuracy specs.
+    </div>
+
+    <h2>Try ProcessLM</h2>
+    <p>ProcessLM simplifies robot calibration: describe your manipulator (DH parameters, joint limits), upload test trajectory data, and it generates the regressor matrix, solves for base parameters, and validates against hold-out data—no symbolic math toolbox required.</p>
+
+    <a href="index.html#access" class="cta">Request Early Access</a>
+  </div>
+</body>
+</html>

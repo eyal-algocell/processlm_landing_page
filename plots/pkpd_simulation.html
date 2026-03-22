@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PK/PD Precision Dosing Simulation</title>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #0d1117;
+            font-family: 'Inter', sans-serif;
+        }
+        #plot {
+            width: 100%;
+            height: 100vh;
+            min-height: 800px;
+        }
+    </style>
+</head>
+<body>
+    <div id="plot"></div>
+    <script>
+        // Two-compartment PK model with indirect-response PD
+        const hours = 72;
+        const dt = 0.1;
+        const steps = Math.floor(hours / dt);
+        const time = Array.from({length: steps + 1}, (_, i) => i * dt);
+
+        // PK Parameters (two-compartment model)
+        const CL = 5.0;              // Clearance (L/h)
+        const V1 = 15.0;             // Central volume (L)
+        const V2 = 25.0;             // Peripheral volume (L)
+        const Q = 8.0;               // Inter-compartmental clearance (L/h)
+        const ka = 0.8;              // Absorption rate (1/h)
+        const F = 0.85;              // Bioavailability
+
+        // PD Parameters (indirect response, inhibition of loss)
+        const E0 = 100;              // Baseline effect
+        const Imax = 0.95;           // Max inhibition
+        const IC50 = 2.5;            // Concentration for 50% effect (mg/L)
+        const gamma = 2.0;           // Hill coefficient
+        const kin = 0.5;             // Production rate (units/h)
+        const kout = 0.005;          // Loss rate (1/h)
+
+        // Dosing regimen (loading dose + maintenance)
+        const doses = [
+            {time: 0, amount: 200, route: 'oral'},     // Loading dose
+            {time: 12, amount: 100, route: 'oral'},    // Maintenance
+            {time: 24, amount: 100, route: 'oral'},
+            {time: 36, amount: 100, route: 'oral'},
+            {time: 48, amount: 100, route: 'oral'},
+            {time: 60, amount: 100, route: 'oral'}
+        ];
+
+        // Initial conditions
+        let A_gut = 0;               // Amount in gut (mg)
+        let A1 = 0;                  // Amount in central compartment (mg)
+        let A2 = 0;                  // Amount in peripheral compartment (mg)
+        let E = E0;                  // Pharmacodynamic effect
+
+        // Arrays for plotting
+        const C_plasma = [];         // Plasma concentration (mg/L)
+        const C_peripheral = [];     // Peripheral concentration (mg/L)
+        const effect = [];           // PD effect
+        const dose_times = [];
+        const dose_markers = [];
+
+        // Simulation
+        for (let step = 0; step <= steps; step++) {
+            const t = step * dt;
+
+            // Check for doses
+            const current_dose = doses.find(d => Math.abs(d.time - t) < dt/2);
+            if (current_dose) {
+                A_gut += current_dose.amount * F;
+                dose_times.push(t);
+                dose_markers.push(A1 / V1);  // Mark at current concentration
+            }
+
+            // PK ODEs (two-compartment with first-order absorption)
+            const dA_gut = -ka * A_gut;
+            const dA1 = ka * A_gut - (CL / V1) * A1 - (Q / V1) * A1 + (Q / V2) * A2;
+            const dA2 = (Q / V1) * A1 - (Q / V2) * A2;
+
+            // Concentration in central compartment
+            const Cp = A1 / V1;
+
+            // PD: Indirect response (inhibition of loss)
+            // dE/dt = kin - kout*(1 - Imax*Cp^γ/(IC50^γ + Cp^γ))*E
+            const inhibition = Imax * Math.pow(Cp, gamma) / (Math.pow(IC50, gamma) + Math.pow(Cp, gamma));
+            const dE = kin - kout * (1 - inhibition) * E;
+
+            // Integration (Euler)
+            A_gut += dA_gut * dt;
+            A1 += dA1 * dt;
+            A2 += dA2 * dt;
+            E += dE * dt;
+
+            // Prevent negatives
+            A_gut = Math.max(A_gut, 0);
+            A1 = Math.max(A1, 0);
+            A2 = Math.max(A2, 0);
+            E = Math.max(E, 0);
+
+            // Add measurement noise
+            const noise = () => 1 + (Math.random() - 0.5) * 0.04;
+            C_plasma.push((A1 / V1) * noise());
+            C_peripheral.push((A2 / V2) * noise());
+            effect.push(E * noise());
+        }
+
+        // Compute AUC (trapezoidal rule)
+        let AUC = 0;
+        for (let i = 1; i < C_plasma.length; i++) {
+            AUC += (C_plasma[i] + C_plasma[i-1]) / 2 * dt;
+        }
+
+        // Compute Cmax and Tmax
+        const Cmax = Math.max(...C_plasma);
+        const Tmax = time[C_plasma.indexOf(Cmax)];
+
+        // Therapeutic window
+        const C_min = 2.0;           // Minimum effective concentration
+        const C_max = 12.0;          // Maximum safe concentration
+        const therapeutic_low = Array(time.length).fill(C_min);
+        const therapeutic_high = Array(time.length).fill(C_max);
+
+        // Time in therapeutic range
+        const in_range = C_plasma.filter(c => c >= C_min && c <= C_max).length;
+        const time_in_range = (in_range / C_plasma.length) * 100;  // Percentage
+
+        const layout = {
+            title: {
+                text: 'PK/PD Precision Dosing Simulation<br><sub>Two-Compartment Model with Indirect-Response PD (Loading + Maintenance)</sub>',
+                font: {color: '#f0f2f5', size: 18}
+            },
+            grid: {rows: 3, columns: 2, pattern: 'independent'},
+            paper_bgcolor: '#0d1117',
+            plot_bgcolor: '#16191f',
+            font: {color: '#7a8394'},
+            showlegend: true,
+            height: 900,
+            margin: {t: 100, b: 50, l: 60, r: 40}
+        };
+
+        const config = {responsive: true, displayModeBar: true};
+
+        const traces = [
+            // Plasma concentration
+            {x: time, y: C_plasma, name: 'Plasma [C]',
+             xaxis: 'x', yaxis: 'y',
+             line: {color: '#34d399', width: 2}, mode: 'lines'},
+            {x: time, y: therapeutic_low, name: 'Therapeutic Min',
+             xaxis: 'x', yaxis: 'y',
+             line: {color: '#ef4444', width: 1, dash: 'dash'}, mode: 'lines'},
+            {x: time, y: therapeutic_high, name: 'Therapeutic Max',
+             xaxis: 'x', yaxis: 'y',
+             line: {color: '#ef4444', width: 1, dash: 'dash'}, mode: 'lines'},
+            {x: dose_times, y: dose_markers, name: 'Doses',
+             xaxis: 'x', yaxis: 'y',
+             mode: 'markers', marker: {size: 10, color: '#fbbf24', symbol: 'triangle-down'}},
+
+            // Peripheral concentration
+            {x: time, y: C_peripheral, name: 'Peripheral [C]',
+             xaxis: 'x2', yaxis: 'y2',
+             line: {color: '#4f8ef7', width: 2}, mode: 'lines'},
+
+            // Pharmacodynamic effect
+            {x: time, y: effect, name: 'PD Effect',
+             xaxis: 'x3', yaxis: 'y3',
+             line: {color: '#a78bfa', width: 2}, mode: 'lines'},
+            {x: time, y: Array(time.length).fill(E0), name: 'Baseline',
+             xaxis: 'x3', yaxis: 'y3',
+             line: {color: '#6b7280', width: 1, dash: 'dot'}, mode: 'lines'},
+
+            // Time in range bar
+            {x: ['In Range', 'Out of Range'], y: [time_in_range, 100 - time_in_range],
+             name: 'Therapeutic Range',
+             xaxis: 'x4', yaxis: 'y4',
+             type: 'bar', marker: {color: ['#10b981', '#ef4444']}},
+
+            // Dosing events timeline
+            {x: dose_times, y: doses.map(d => d.amount),
+             name: 'Dose Amount',
+             xaxis: 'x5', yaxis: 'y5',
+             type: 'bar', marker: {color: '#f59e0b'}},
+
+            // PK metrics
+            {x: ['AUC', 'Cmax', 'Tmax'], y: [AUC, Cmax, Tmax],
+             name: 'PK Metrics',
+             xaxis: 'x6', yaxis: 'y6',
+             type: 'bar', marker: {color: ['#06b6d4', '#ec4899', '#8b5cf6']}}
+        ];
+
+        // Configure axes
+        layout.xaxis = {title: '', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+        layout.yaxis = {title: 'Concentration (mg/L)', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+
+        layout.xaxis2 = {title: '', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+        layout.yaxis2 = {title: 'Concentration (mg/L)', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+
+        layout.xaxis3 = {title: '', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+        layout.yaxis3 = {title: 'Effect (units)', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+
+        layout.xaxis4 = {title: '', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+        layout.yaxis4 = {title: 'Time (%)', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+
+        layout.xaxis5 = {title: 'Time (hours)', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+        layout.yaxis5 = {title: 'Dose (mg)', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+
+        layout.xaxis6 = {title: '', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+        layout.yaxis6 = {title: 'Value', gridcolor: '#262c36', zerolinecolor: '#262c36'};
+
+        // Annotation for Cmax
+        layout.annotations = [{
+            x: Tmax, y: Cmax, xref: 'x', yref: 'y',
+            text: `Cmax = ${Cmax.toFixed(1)} mg/L`, showarrow: true,
+            arrowhead: 2, ax: 40, ay: -40,
+            font: {color: '#34d399'}
+        }];
+
+        Plotly.newPlot('plot', traces, layout, config);
+    </script>
+</body>
+</html>

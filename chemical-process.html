@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chemical Process Parameter Estimation | ProcessLM Use Case</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚗️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0b0d;
+      --bg-card: #111318;
+      --bg-subtle: #16191f;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #f0f2f5;
+      --text-muted: #7a8394;
+      --text-dim: #4a5568;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --green: #34d399;
+      --code-bg: #0d1117;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    nav { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; transition: color 0.2s; }
+    nav a:hover { color: var(--accent); }
+    h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+    h2 { font-size: 1.75rem; font-weight: 600; margin: 3rem 0 1.5rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h3 { font-size: 1.3rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--text); }
+    p { margin-bottom: 1.25rem; color: var(--text-muted); }
+    .tag { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem; }
+    .equation {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      line-height: 2;
+      color: var(--text);
+    }
+    .equation .katex { font-size: 1.1em; }
+    .equation .katex-display { margin: 1em 0; }
+    .eq-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
+    .highlight { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 1.25rem 1.5rem; border-radius: 6px; margin: 1.5rem 0; }
+    .highlight strong { color: var(--accent); }
+    ul { margin: 1rem 0 1.5rem 1.5rem; color: var(--text-muted); }
+    ul li { margin-bottom: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg-subtle); color: var(--text); font-weight: 600; }
+    td { color: var(--text-muted); }
+    code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9rem; color: var(--green); }
+    .cta { display: inline-block; background: var(--accent); color: white; padding: 0.9rem 1.8rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 2rem; transition: opacity 0.2s; }
+    .cta:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to ProcessLM</a>
+  </nav>
+
+  <div class="container">
+    <span class="tag">Chemical / Process Operations</span>
+    <h1>Distillation Column Parameter Estimation</h1>
+    <p><strong>Dynamic parameter estimation and soft sensing for separation process monitoring</strong></p>
+
+    <h2>Introduction</h2>
+    <p>Distillation columns are ubiquitous in chemical, petrochemical, and pharmaceutical industries for separating liquid mixtures. Control and optimization require accurate models, but key parameters—tray efficiencies, heat transfer coefficients, and feed composition—drift due to fouling, corrosion, and upstream variability.</p>
+
+    <p>The challenge: process control systems rely on infrequent lab composition measurements (gas chromatography every 2–8 hours), while temperature sensors provide continuous data. Can we estimate hidden composition profiles and uncertain process parameters from temperature measurements alone?</p>
+
+    <div class="highlight">
+      <strong>Why this matters:</strong> Accurate soft sensors reduce lab analysis burden by 50–70%, enable real-time optimization of reflux ratio for energy savings, and provide early warnings of tray damage or feed upsets—preventing off-spec product and unplanned shutdowns.
+    </div>
+
+    <h2>Process Science: Vapor-Liquid Equilibrium and Mass Balance</h2>
+    <p>A distillation column separates a binary mixture (e.g., methanol-water, benzene-toluene) by exploiting differences in volatility. Key physics:</p>
+
+    <ul>
+      <li><strong>Vapor-liquid equilibrium (VLE):</strong> At each tray, liquid and vapor reach thermodynamic equilibrium described by Raoult's law or more complex activity coefficient models</li>
+      <li><strong>Mass transfer:</strong> Component transfer between phases governed by tray efficiency (Murphree efficiency EMV)</li>
+      <li><strong>Energy balance:</strong> Condenser duty, reboiler duty, and sensible/latent heat determine vapor flow rates</li>
+      <li><strong>Hydraulic dynamics:</strong> Liquid holdup on each tray creates time delays; vapor flows are quasi-steady-state</li>
+      <li><strong>Feed disturbances:</strong> Upstream process variability changes feed flow rate F and composition zF</li>
+    </ul>
+
+    <h2>Governing Equations: Stagewise DAE Model</h2>
+    <p>We use a <strong>MESH (Material, Equilibrium, Summation, Heat) formulation</strong> for N trays:</p>
+
+    <div class="equation">
+<span class="eq-label">States (per tray $j$):</span>
+$$\begin{aligned}
+x_j &= \text{liquid mole fraction of light component [-]} \\
+M_j &= \text{liquid holdup [kmol]} \\
+T_j &= \text{tray temperature [K]}
+\end{aligned}$$
+
+<span class="eq-label">Differential Equations (Mass):</span>
+$$\begin{aligned}
+\frac{dM_j}{dt} &= L_{j+1} + F \cdot \delta(j-j_F) - L_j - V_j \quad \text{[total moles]} \\
+\frac{d(M_j \cdot x_j)}{dt} &= L_{j+1} \cdot x_{j+1} + F \cdot z_F \cdot \delta(j-j_F) - L_j \cdot x_j - V_j \cdot y_j \quad \text{[light component]}
+\end{aligned}$$
+
+<span class="eq-label">Algebraic Equations:</span>
+$$\begin{aligned}
+y_j &= E_{\text{MV}} \cdot y_j^* + (1 - E_{\text{MV}}) \cdot y_{j+1} \quad \text{[Murphree efficiency]} \\
+y_j^* &= K_j(T_j, P) \cdot x_j \quad \text{[VLE equilibrium, } K = \text{relative volatility]} \\
+L_j &= \beta \cdot \sqrt{M_j - M_w} \quad \text{[Francis weir formula, hydraulic]} \\
+V_j &= V_{\text{total}} \quad \text{[constant molar overflow assumption]}
+\end{aligned}$$
+
+<span class="eq-label">Energy Balance (simplified):</span>
+$$\begin{aligned}
+0 &= L_{j+1} \cdot h_L(T_{j+1}) + V_{j-1} \cdot h_V(T_{j-1}) - L_j \cdot h_L(T_j) - V_j \cdot h_V(T_j) + F \cdot h_F \cdot \delta(j-j_F) \\
+&\Rightarrow T_j = g(x_j, P, V_j, L_j) \quad \text{[temperature from enthalpy balance]}
+\end{aligned}$$
+
+<span class="eq-label">Boundary Conditions:</span>
+$$\begin{aligned}
+j=1 \text{ (condenser)}: & \quad L_1 = RD \text{ (reflux)}, \; V_1 = 0 \\
+j=N \text{ (reboiler)}: & \quad V_N = V_{\text{total}}, \; L_{N+1} = B \text{ (bottoms flow)}
+\end{aligned}$$
+    </div>
+
+    <h3>Unknown Parameters (8 total)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+          <th>Units</th>
+          <th>Typical Range</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>EMV</td><td>Murphree vapor tray efficiency</td><td>—</td><td>0.5 – 0.95</td></tr>
+        <tr><td>α</td><td>Relative volatility (temperature-dependent)</td><td>—</td><td>1.2 – 4.0</td></tr>
+        <tr><td>Mw</td><td>Weir holdup (hydraulic)</td><td>kmol</td><td>0.1 – 2.0</td></tr>
+        <tr><td>β</td><td>Weir coefficient</td><td>—</td><td>0.5 – 1.5</td></tr>
+        <tr><td>UA_cond</td><td>Condenser heat transfer coefficient</td><td>kW/K</td><td>5 – 50</td></tr>
+        <tr><td>UA_reb</td><td>Reboiler heat transfer coefficient</td><td>kW/K</td><td>5 – 50</td></tr>
+        <tr><td>zF</td><td>Feed composition (drifts with upstream)</td><td>—</td><td>0.3 – 0.7</td></tr>
+        <tr><td>F</td><td>Feed flow rate (measured but biased)</td><td>kmol/h</td><td>50 – 200</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Parameter Estimation Problem</h2>
+    <p>Given measurements from a distillation column:</p>
+    <ul>
+      <li><strong>Continuous:</strong> Tray temperatures T1, T5, T10, T15, T20 [thermocouples, 1-min resolution]</li>
+      <li><strong>Continuous:</strong> Reflux rate RD, reboiler duty QR [flow meters, heat flux sensors]</li>
+      <li><strong>Delayed:</strong> Distillate composition xD, bottoms composition xB [GC every 4 hours]</li>
+    </ul>
+
+    <p>The inverse problem is formulated as <strong>moving horizon estimation (MHE)</strong> with a sliding window of τ = 8 hours:</p>
+
+    <div class="equation">
+<span class="eq-label">Minimize over window $[t-\tau, t]$:</span>
+$$J(\theta, x_0) = ||x(t-\tau) - \hat{x}_0||^2_P + \sum ||y_{\text{obs}}(t_k) - h(x(t_k), \theta)||^2_R + \lambda \cdot ||\theta - \theta_{\text{prior}}||^2$$
+
+<span class="eq-label">Subject to:</span>
+$$\begin{aligned}
+\frac{dx}{dt} &= f(x, u, \theta) \quad \text{[DAE model integration]} \\
+x_j &\in [0, 1], \; M_j > 0, \; T_j \in [T_{bp1}, T_{bp2}] \quad \text{[physical bounds]}
+\end{aligned}$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+\theta &= [E_{\text{MV}}, \alpha, M_w, \beta, UA_{\text{cond}}, UA_{\text{reb}}, z_F, F] \\
+y_{\text{obs}} &= [T_1, T_5, T_{10}, T_{15}, T_{20}, x_D^*, x_B^*] \quad \text{[* = sparse]} \\
+h(x, \theta) &= \text{measurement function (temperatures from energy balance)} \\
+x_0 &= \text{initial state estimate at } t-\tau \\
+P, R &= \text{prior covariance, measurement noise covariance}
+\end{aligned}$$
+    </div>
+
+    <div class="highlight">
+      <strong>Soft sensor output:</strong> The MHE framework simultaneously estimates unmeasured tray compositions x3, x7, x12, ... and uncertain parameters θ, providing real-time composition profiles without waiting for lab results.
+    </div>
+
+    <h2>Simulation Framework</h2>
+    <p>Generate synthetic column operation data:</p>
+    <ol>
+      <li><strong>Nominal steady-state:</strong> Solve algebraic MESH equations for initial profiles (xj, Mj, Tj)</li>
+      <li><strong>Step disturbances:</strong>
+        <ul>
+          <li>Feed composition: zF steps from 0.45 to 0.52 at t=2h</li>
+          <li>Feed flow rate: F steps from 100 to 120 kmol/h at t=5h</li>
+          <li>Reflux ratio: RD/D increases 10% at t=7h (energy optimization)</li>
+        </ul>
+      </li>
+      <li><strong>DAE integration:</strong> Use DASSL or IDA solver with consistent initial conditions</li>
+      <li><strong>Add noise:</strong> Temperature: ±0.3 K, GC composition: ±0.01 mole fraction, delayed by 4h</li>
+      <li><strong>Parameter drift:</strong> EMV decreases 5% over 24h (tray fouling), zF oscillates ±0.03 (upstream variability)</li>
+    </ol>
+
+    <h2>Estimation Workflow</h2>
+
+    <h3>1. Dynamic Least Squares (Offline Calibration)</h3>
+    <p>For historical data campaigns:</p>
+    <ul>
+      <li>Batch optimization over entire run (24–72 hours)</li>
+      <li>Simultaneous parameter estimation and trajectory smoothing</li>
+      <li>Use SQP or interior-point methods with DAE constraints</li>
+    </ul>
+
+    <h3>2. Moving Horizon Estimation (MHE)</h3>
+    <p>For real-time soft sensing:</p>
+    <div class="equation">
+<span class="eq-label">At each time step $t$:</span>
+$$\begin{aligned}
+&\text{1. Slide window: discard data before } t-\tau \\
+&\text{2. Solve constrained NLP:} \\
+&\qquad \min J(\theta, x(t-\tau)) \text{ over } [t-\tau, t] \\
+&\text{3. Extract current estimates: } \hat{\theta}(t), \; \hat{x}(t) \\
+&\text{4. Advance window to } [t-\tau+\Delta t, t+\Delta t] \\[1em]
+&\text{Computational budget: }\sim 10 \text{ seconds per update (DAE solve + NLP)} \\
+&\qquad \Rightarrow \text{ Use warm-start from previous solution}
+\end{aligned}$$
+    </div>
+
+    <h3>3. Extended Kalman Filter (EKF) for State Estimation</h3>
+    <p>Faster alternative when parameters are known or slowly varying:</p>
+    <ul>
+      <li>Augment state vector: [x1, ..., xN, M1, ..., MN, EMV, zF]</li>
+      <li>Linearize DAE system around current estimate</li>
+      <li>Kalman update when delayed GC measurements arrive</li>
+      <li>Computational cost: ~0.5 seconds per update (suitable for 1-min control loops)</li>
+    </ul>
+
+    <h2>Identifiability</h2>
+    <p>Key insights from sensitivity analysis:</p>
+
+    <div class="highlight">
+      <strong>Temperature-only limitations:</strong>
+      <ul>
+        <li><strong>Tray efficiency EMV vs. relative volatility α:</strong> Highly correlated—both affect separation sharpness. Requires occasional GC measurements to distinguish.</li>
+        <li><strong>Feed composition zF:</strong> Observable from temperature profile shift, but 2–4 hour delay until column responds (tray holdups create time constants)</li>
+        <li><strong>Hydraulic parameters (Mw, β):</strong> Weakly observable from steady-state temperatures. Require transient excitation (step changes in reflux).</li>
+        <li><strong>Heat transfer coefficients:</strong> Identifiable only if condenser/reboiler temperatures are measured separately</li>
+      </ul>
+    </div>
+
+    <p><strong>Recommendation:</strong> Fix hydraulic parameters (Mw, β) from startup commissioning tests. Estimate EMV, zF online using MHE with weekly GC recalibration. Monitor UA_cond/UA_reb for fouling trends (annual maintenance indicator).</p>
+
+    <h2>Validation Strategy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Validation Test</th>
+          <th>Method</th>
+          <th>Acceptance Criterion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Temperature prediction</td>
+          <td>Hold-out test: predict T5, T15 from T1, T10, T20</td>
+          <td>RMSE < 0.5 K</td>
+        </tr>
+        <tr>
+          <td>Soft sensor accuracy</td>
+          <td>Compare MHE composition estimate to delayed GC</td>
+          <td>|xD_est - xD_GC| < 0.015</td>
+        </tr>
+        <tr>
+          <td>Disturbance rejection</td>
+          <td>Feed step change: time to detect zF change</td>
+          <td>Detection within 30 minutes</td>
+        </tr>
+        <tr>
+          <td>Robustness</td>
+          <td>Operate with 1 failed thermocouple</td>
+          <td>Graceful degradation, no divergence</td>
+        </tr>
+        <tr>
+          <td>Computational speed</td>
+          <td>MHE solve time on PLC hardware</td>
+          <td>< 10 seconds per update</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Industrial Value</h2>
+    <p>Mechanistic parameter estimation and soft sensing deliver:</p>
+    <ul>
+      <li><strong>Energy savings:</strong> Real-time optimization of reflux ratio based on accurate composition estimates reduces steam consumption by 8–15% (typical payback: 6–18 months)</li>
+      <li><strong>Product quality:</strong> Early detection of off-spec distillate/bottoms enables corrective action before product tank contamination</li>
+      <li><strong>Maintenance planning:</strong> Monitoring tray efficiency EMV trends identifies fouling or damage 2–3 weeks before product quality deteriorates</li>
+      <li><strong>Lab efficiency:</strong> Reducing GC frequency from every 2h to every 8h cuts analytical costs by 75% while maintaining control performance</li>
+      <li><strong>Startup acceleration:</strong> Model-based composition estimates reduce time to steady-state by 20–30% (saving 4–6 hours of transition per startup)</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Case study:</strong> A petrochemical refinery implemented MHE-based soft sensors across 12 distillation columns. Energy savings totaled $2.4M annually, and unplanned shutdowns due to quality excursions decreased by 60% (avoiding $5M in lost production).
+    </div>
+
+    <h2>Try ProcessLM</h2>
+    <p>ProcessLM automates the entire workflow: describe your column configuration and control objectives in natural language, and it generates the MESH model, tunes the MHE problem, and deploys soft sensors—no Aspen Custom Modeler scripting required.</p>
+
+    <a href="index.html#access" class="cta">Request Early Access</a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Power Systems State Estimation | ProcessLM Use Case</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚗️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0b0d;
+      --bg-card: #111318;
+      --bg-subtle: #16191f;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #f0f2f5;
+      --text-muted: #7a8394;
+      --text-dim: #4a5568;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --green: #34d399;
+      --code-bg: #0d1117;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    nav { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; transition: color 0.2s; }
+    nav a:hover { color: var(--accent); }
+    h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+    h2 { font-size: 1.75rem; font-weight: 600; margin: 3rem 0 1.5rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h3 { font-size: 1.3rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--text); }
+    p { margin-bottom: 1.25rem; color: var(--text-muted); }
+    .tag { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem; }
+    .equation {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      line-height: 2;
+      color: var(--text);
+    }
+    .equation .katex { font-size: 1.1em; }
+    .equation .katex-display { margin: 1em 0; }
+    .eq-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
+    .highlight { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 1.25rem 1.5rem; border-radius: 6px; margin: 1.5rem 0; }
+    .highlight strong { color: var(--accent); }
+    ul { margin: 1rem 0 1.5rem 1.5rem; color: var(--text-muted); }
+    ul li { margin-bottom: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg-subtle); color: var(--text); font-weight: 600; }
+    td { color: var(--text-muted); }
+    code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9rem; color: var(--green); }
+    .cta { display: inline-block; background: var(--accent); color: white; padding: 0.9rem 1.8rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 2rem; transition: opacity 0.2s; }
+    .cta:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to ProcessLM</a>
+  </nav>
+
+  <div class="container">
+    <span class="tag">Power System Operations</span>
+    <h1>Distribution Grid State Estimation</h1>
+    <p><strong>Network parameter and state estimation from sparse SCADA, AMI, and PMU measurements</strong></p>
+
+    <h2>Introduction</h2>
+    <p>Electric distribution grids are undergoing rapid transformation with the integration of rooftop solar, electric vehicles, and battery storage. Utilities need accurate real-time visibility into voltage profiles, line flows, and DER (distributed energy resource) injections to maintain reliability and optimize operations.</p>
+
+    <p>The challenge: distribution systems have sparse instrumentation compared to transmission networks. SCADA provides measurements at substations, advanced metering infrastructure (AMI) gives customer-level data with delays, and micro-PMUs (μPMU) offer high-resolution phasors at limited locations. Can we reconstruct the full network state and estimate unknown line parameters from this partial data?</p>
+
+    <div class="highlight">
+      <strong>Why this matters:</strong> Accurate state estimation enables volt-var optimization (reducing losses by 2–5%), hosting capacity analysis for solar/EV interconnection, fault location identification, and proactive voltage regulation—preventing equipment damage and customer complaints.
+    </div>
+
+    <h2>Electrical Network Science</h2>
+    <p>A distribution feeder operates as a radial network governed by fundamental electrical laws:</p>
+
+    <ul>
+      <li><strong>Kirchhoff's Current Law (KCL):</strong> Net current injection at each bus equals zero (sum of loads, generation, and line flows)</li>
+      <li><strong>Kirchhoff's Voltage Law (KVL):</strong> Voltage drops along branches equal sum of impedance drops</li>
+      <li><strong>AC power flow:</strong> Active and reactive power flows depend on voltage magnitudes, phase angles, and branch impedances</li>
+      <li><strong>Load variability:</strong> Residential/commercial loads vary hourly, PV generation follows solar irradiance, EVs charge in evening peaks</li>
+      <li><strong>Voltage regulation devices:</strong> Capacitor banks, load tap changers (LTCs), and voltage regulators dynamically adjust to maintain voltage within ±5% of nominal</li>
+    </ul>
+
+    <h2>Mathematical Model: AC Power Flow Equations</h2>
+    <p>The distribution network is modeled as a <strong>directed graph</strong> with N buses and L branches:</p>
+
+    <div class="equation">
+<span class="eq-label">States (per bus $i$):</span>
+$$\begin{aligned}
+V_i &= \text{voltage magnitude [pu or V]} \\
+\theta_i &= \text{voltage phase angle [rad]} \\
+P_i, Q_i &= \text{active and reactive power injection [kW, kVAR]}
+\end{aligned}$$
+
+<span class="eq-label">Power Flow Equations (nonlinear algebraic):</span>
+$$\begin{aligned}
+P_i &= V_i \sum_j V_j (G_{ij} \cos(\theta_i - \theta_j) + B_{ij} \sin(\theta_i - \theta_j)) \\
+Q_i &= V_i \sum_j V_j (G_{ij} \sin(\theta_i - \theta_j) - B_{ij} \cos(\theta_i - \theta_j))
+\end{aligned}$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+G_{ij} + jB_{ij} &= \text{admittance matrix element (from line impedances)} \\
+\sum &\text{ over all buses } j \text{ connected to bus } i
+\end{aligned}$$
+
+<span class="eq-label">Branch Flows:</span>
+$$\begin{aligned}
+P_{ij} &= V_i^2 G_{ij} - V_i V_j (G_{ij} \cos(\theta_i - \theta_j) + B_{ij} \sin(\theta_i - \theta_j)) \\
+Q_{ij} &= -V_i^2 B_{ij} - V_i V_j (G_{ij} \sin(\theta_i - \theta_j) - B_{ij} \cos(\theta_i - \theta_j))
+\end{aligned}$$
+
+<span class="eq-label">Constraints:</span>
+$$\begin{aligned}
+V_{\min} &\leq V_i \leq V_{\max} \quad \text{[ANSI C84.1: 0.95 pu} \leq V \leq \text{1.05 pu]} \\
+P_{ij}^2 + Q_{ij}^2 &\leq S_{\max,ij}^2 \quad \text{[thermal limits]}
+\end{aligned}$$
+    </div>
+
+    <h3>Unknown Parameters (varies by feeder)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+          <th>Units</th>
+          <th>Typical Uncertainty</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Rij, Xij</td><td>Line resistance and reactance</td><td>Ω/km</td><td>±10–30% (corrosion, wrong database)</td></tr>
+        <tr><td>Zij = Rij + jXij</td><td>Branch impedance</td><td>Ω</td><td>±15% (aging, temperature)</td></tr>
+        <tr><td>Pi_DER</td><td>Rooftop PV power injection</td><td>kW</td><td>±20% (no telemetry at many sites)</td></tr>
+        <tr><td>Qi_load</td><td>Reactive power demand</td><td>kVAR</td><td>±30% (power factor uncertainty)</td></tr>
+        <tr><td>tap_pos</td><td>Transformer tap position</td><td>—</td><td>±1 tap (telemetry failure)</td></tr>
+        <tr><td>Vi, θi</td><td>Unmeasured bus voltages/angles</td><td>pu, rad</td><td>Hidden states</td></tr>
+        <tr><td>topology</td><td>Switch status (NO/NC)</td><td>binary</td><td>Inferred from measurements</td></tr>
+      </tbody>
+    </table>
+
+    <h2>State Estimation Challenge</h2>
+    <p>Given measurements from a distribution feeder with 100–500 buses:</p>
+    <ul>
+      <li><strong>SCADA (RTU):</strong> Substation voltage, feeder head active/reactive power, capacitor bank status [4-second refresh, <1% error]</li>
+      <li><strong>AMI (smart meters):</strong> Customer-level voltage magnitudes, active power [15-minute intervals, ±1% error, 5–30 min latency]</li>
+      <li><strong>μPMU:</strong> Voltage phasor (magnitude + angle) at 2–5 strategic buses [30–60 Hz, ±0.1% error]</li>
+      <li><strong>Pseudo-measurements:</strong> Load forecasts from historical data [±20–40% error]</li>
+    </ul>
+
+    <p>The inverse problem is formulated as <strong>weighted least squares with inequality constraints</strong>:</p>
+
+    <div class="equation">
+<span class="eq-label">Minimize:</span>
+$$J(x, \theta) = \sum_k \left[ \frac{(z_{\text{meas},k} - h_k(x, \theta))^2}{\sigma^2_k} \right] + \lambda \cdot ||x_{\text{prior}} - x||^2_P$$
+
+<span class="eq-label">Subject to:</span>
+$$\begin{aligned}
+g(x, \theta) &= 0 \quad \text{[power flow equations: } P_i, Q_i \text{ balance]} \\
+x_{\min} &\leq x \leq x_{\max} \quad \text{[voltage limits, physical bounds]}
+\end{aligned}$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+x &= [V_1, \ldots, V_N, \theta_1, \ldots, \theta_N] \quad \text{[states: voltages and angles]} \\
+\theta &= [R_{12}, X_{12}, \ldots, P_{\text{DER},5}, \ldots, \text{tap}_{\text{pos}}] \quad \text{[parameters]} \\
+z_{\text{meas}} &= [V_{\text{sub}}, P_{\text{sub}}, Q_{\text{sub}}, V_{\text{AMI},i}, P_{\text{AMI},i}, V_{\mu\text{PMU},j}, \theta_{\mu\text{PMU},j}] \\
+h_k(x, \theta) &= \text{measurement function (maps states to observations)} \\
+\sigma^2_k &= \text{measurement variance (SCADA: 0.01}^2\text{, AMI: 0.02}^2\text{, pseudo: 0.3}^2\text{)}
+\end{aligned}$$
+    </div>
+
+    <div class="highlight">
+      <strong>Observability issue:</strong> With sparse measurements, some buses have no direct observations. The system is <em>weakly observable</em>—we must use power flow constraints and pseudo-measurements (load forecasts) to propagate information through the network.
+    </div>
+
+    <h2>Simulation Design</h2>
+    <p>Generate synthetic feeder data for IEEE 123-bus or 8500-node test feeders:</p>
+    <ol>
+      <li><strong>Define base topology:</strong> Radial feeder with primary/secondary distribution lines, transformers, regulators, capacitors</li>
+      <li><strong>Time-series profiles:</strong>
+        <ul>
+          <li>Residential loads: NREL OpenEI profiles (winter/summer, weekday/weekend)</li>
+          <li>Rooftop PV: 30% penetration, 15-minute granularity with cloud transients</li>
+          <li>EV charging: Evening peak (6–10 PM), Level 2 chargers (7 kW)</li>
+        </ul>
+      </li>
+      <li><strong>Voltage regulator actions:</strong> LTC operates when V < 0.97 or V > 1.03, ±16 taps</li>
+      <li><strong>Add noise and dropouts:</strong> AMI: 2% random dropouts per interval, ±1% Gaussian noise; μPMU: occasional GPS sync loss</li>
+      <li><strong>Parameter variations:</strong> Line impedances drift ±10% (temperature effects), 20% of PV sites have no telemetry</li>
+    </ol>
+
+    <h2>Estimation Methods</h2>
+
+    <h3>1. Weighted Least Squares (WLS)</h3>
+    <p>Classical distribution system state estimation:</p>
+    <ul>
+      <li>Solve nonlinear optimization via Gauss-Newton or Levenberg-Marquardt</li>
+      <li>Iterate until convergence: ||x^(k+1) - x^(k)|| < ε</li>
+      <li>Chi-square test for bad data detection (outlier rejection)</li>
+      <li>Computational cost: 0.1–1 second per snapshot (suitable for 4-second SCADA cycle)</li>
+    </ul>
+
+    <h3>2. Extended Kalman Filter (EKF)</h3>
+    <p>For dynamic state estimation with time-series AMI data:</p>
+    <div class="equation">
+$$\begin{aligned}
+\text{State vector: } & x = [V_1, \ldots, V_N, \theta_1, \ldots, \theta_N, P_{\text{DER},1}, \ldots, P_{\text{DER},M}] \\
+& \text{Augment slowly-varying DER injections and tap positions} \\[1em]
+\text{Prediction (quasi-steady):} \\
+& x_{k+1|k} = x_{k|k} + w_k \quad \text{[process noise for load/DER changes]} \\[1em]
+\text{Update when AMI data arrives:} \\
+& K_k = P_{k|k-1} H^T (H P_{k|k-1} H^T + R)^{-1} \\
+& x_{k|k} = x_{k|k-1} + K_k (z_k - h(x_{k|k-1})) \\
+& P_{k|k} = (I - K_k H) P_{k|k-1} \\[1em]
+& \text{Jacobian } H = \frac{\partial h}{\partial x} \text{ (sensitivity of measurements to states)}
+\end{aligned}$$
+    </div>
+
+    <h3>3. Semidefinite Programming (SDP) Relaxation</h3>
+    <p>For globally optimal solutions when WLS gets stuck in local minima:</p>
+    <ul>
+      <li>Reformulate power flow as convex SDP problem (OPF relaxation)</li>
+      <li>Solve via interior-point methods (MOSEK, SeDuMi)</li>
+      <li>Check rank-1 solution for exactness</li>
+      <li>Computationally expensive (10–60 seconds), used for planning studies</li>
+    </ul>
+
+    <h3>4. Bayesian Estimation with MCMC</h3>
+    <p>For uncertainty quantification in parameter estimation:</p>
+    <ul>
+      <li>Define prior distributions on line impedances, DER capacities</li>
+      <li>Sample posterior p(θ | z) via Markov Chain Monte Carlo (Metropolis-Hastings)</li>
+      <li>Obtain credible intervals for hosting capacity analysis</li>
+    </ul>
+
+    <h2>Observability and Sensor Placement</h2>
+    <p>Key results from observability analysis:</p>
+
+    <div class="highlight">
+      <strong>Minimum sensor requirements:</strong>
+      <ul>
+        <li><strong>Feeder head:</strong> Must measure V, P, Q at substation (mandatory for power balance)</li>
+        <li><strong>Voltage measurements:</strong> Need at least 1 measurement per 5–10 buses for acceptable error (<2% voltage error)</li>
+        <li><strong>μPMU placement:</strong> Place at mid-feeder and end-of-line to capture voltage drops and detect high-impedance faults</li>
+        <li><strong>Topology observability:</strong> Require at least 1 measurement per switch zone to infer topology changes</li>
+        <li><strong>DER visibility:</strong> Solar inverters with IEEE 1547 telemetry improve state estimation accuracy by 40–60%</li>
+      </ul>
+    </div>
+
+    <p><strong>Optimal sensor placement:</strong> Greedy algorithm maximizes reduction in voltage estimation covariance per sensor installed. Typical result: 5–8 strategically placed μPMUs reduce average voltage error from 3.2% to 0.8% on IEEE 123-bus feeder.</p>
+
+    <h2>Validation Strategy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Validation Test</th>
+          <th>Method</th>
+          <th>Acceptance Criterion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Voltage estimation error</td>
+          <td>Compare estimated V to true V (ground truth from load flow)</td>
+          <td>RMSE < 0.01 pu (1%)</td>
+        </tr>
+        <tr>
+          <td>Power flow estimation</td>
+          <td>Validate branch flows Pij, Qij at instrumented lines</td>
+          <td>MAPE < 10%</td>
+        </tr>
+        <tr>
+          <td>Bad data detection</td>
+          <td>Inject 5% gross errors (meter failures), test detection rate</td>
+          <td>Detection rate > 95%</td>
+        </tr>
+        <tr>
+          <td>Topology change detection</td>
+          <td>Simulate switch operation, measure time to convergence</td>
+          <td>Detect within 2 time steps</td>
+        </tr>
+        <tr>
+          <td>Computational speed</td>
+          <td>Solve 500-bus feeder on edge computing hardware</td>
+          <td>< 1 second per snapshot</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Utility Impact</h2>
+    <p>Mechanistic state estimation enables operational improvements:</p>
+    <ul>
+      <li><strong>Volt-Var Optimization (VVO):</strong> Use real-time voltage profiles to coordinate capacitor banks and regulators, reducing losses by 2–5% ($50K–200K annually per substation)</li>
+      <li><strong>Hosting Capacity:</strong> Accurate impedance estimates improve solar/EV interconnection limits by 15–30% (enables more DER without voltage violations)</li>
+      <li><strong>Fault Location:</strong> Rapid voltage/current anomaly detection reduces outage duration by 20–40% (SAIDI improvement)</li>
+      <li><strong>Asset Health Monitoring:</strong> Track transformer loading and line losses to prioritize replacements (avoid $500K+ emergency failures)</li>
+      <li><strong>Grid Modernization Planning:</strong> Identify circuits requiring reinforcement or AMI sensor upgrades based on estimation uncertainty</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Case study:</strong> A California utility deployed distribution state estimation across 50 feeders with 80% AMI coverage and 3 μPMUs per feeder. VVO optimization saved 4.2 GWh annually ($420K), and improved voltage regulation reduced customer complaints by 65%.
+    </div>
+
+    <h2>Try ProcessLM</h2>
+    <p>ProcessLM streamlines grid modeling: describe your feeder topology and available measurements, and it generates the power flow model, configures the state estimator, and validates observability—no PowerFactory or GridLAB-D scripting required.</p>
+
+    <a href="index.html#access" class="cta">Request Early Access</a>
+  </div>
+</body>
+</html>

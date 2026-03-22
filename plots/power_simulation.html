@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Distribution Grid State Estimation — ProcessLM</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary:   #0d1117;
+      --bg-card:      #161b22;
+      --bg-card2:     #1c2128;
+      --border:       #30363d;
+      --text-primary: #e6edf3;
+      --text-muted:   #8b949e;
+      --accent-blue:  #58a6ff;
+      --accent-green: #3fb950;
+      --accent-amber: #d29922;
+      --accent-red:   #f85149;
+      --accent-purple:#bc8cff;
+      --accent-cyan:  #39d353;
+      --grid-line:    rgba(48,54,61,0.6);
+    }
+
+    html, body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    .header {
+      padding: 28px 40px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text-primary);
+    }
+    .header-left h1 span { color: var(--accent-blue); }
+    .header-left p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .badge-blue   { color: var(--accent-blue);   border-color: var(--accent-blue);   background: rgba(88,166,255,0.08); }
+    .badge-green  { color: var(--accent-green);  border-color: var(--accent-green);  background: rgba(63,185,80,0.08);  }
+    .badge-amber  { color: var(--accent-amber);  border-color: var(--accent-amber);  background: rgba(210,153,34,0.08); }
+    .badge-purple { color: var(--accent-purple); border-color: var(--accent-purple); background: rgba(188,140,255,0.08);}
+
+    /* ── KPI Strip ────────────────────────────────────────────────── */
+    .kpi-strip {
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .kpi-card {
+      flex: 1;
+      background: var(--bg-card);
+      padding: 14px 20px;
+      min-width: 120px;
+    }
+    .kpi-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; }
+    .kpi-value { font-size: 1.45rem; font-weight: 700; margin-top: 4px; line-height: 1; }
+    .kpi-sub   { font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; }
+    .kpi-delta { font-size: 0.72rem; font-weight: 600; margin-top: 4px; }
+    .delta-up   { color: var(--accent-green); }
+    .delta-down { color: var(--accent-red);   }
+    .delta-warn { color: var(--accent-amber);  }
+
+    /* ── Controls ─────────────────────────────────────────────────── */
+    .controls {
+      padding: 14px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card2);
+    }
+    .ctrl-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+    .ctrl-btn {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ctrl-btn:hover  { border-color: var(--accent-blue); color: var(--accent-blue); }
+    .ctrl-btn.active { border-color: var(--accent-blue); background: rgba(88,166,255,0.12); color: var(--accent-blue); }
+    .ctrl-sep { width: 1px; height: 22px; background: var(--border); }
+    .ctrl-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-box {
+      width: 32px; height: 17px;
+      border-radius: 9px;
+      background: var(--border);
+      position: relative;
+      transition: background 0.2s;
+    }
+    .toggle-box.on { background: var(--accent-blue); }
+    .toggle-knob {
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: #fff;
+      transition: left 0.2s;
+    }
+    .toggle-box.on .toggle-knob { left: 17px; }
+
+    /* ── Grid ─────────────────────────────────────────────────────── */
+    .plots-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      padding: 0;
+    }
+    @media (max-width: 1100px) { .plots-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 680px)  { .plots-grid { grid-template-columns: 1fr; } }
+
+    .plot-cell {
+      background: var(--bg-card);
+      padding: 0;
+      position: relative;
+      min-height: 320px;
+    }
+    .plot-cell-header {
+      padding: 14px 18px 8px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .plot-cell-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .plot-cell-sub {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .plot-cell-stat {
+      text-align: right;
+    }
+    .stat-val {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .stat-lbl {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .plotly-div { width: 100%; height: 260px; }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    .footer {
+      padding: 16px 40px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .footer-left { font-size: 0.72rem; color: var(--text-muted); }
+    .footer-left span { color: var(--accent-blue); font-weight: 600; }
+    .status-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      margin-right: 5px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.35; }
+    }
+
+    /* ── Tooltip override ─────────────────────────────────────────── */
+    .js-plotly-plot .plotly .modebar { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════════════ -->
+<header class="header">
+  <div class="header-left">
+    <h1>Distribution Grid <span>State Estimation</span></h1>
+    <p>IEEE 33-Bus Radial Feeder · Solar DG Integration · 24-Hour Horizon · 15-min Resolution</p>
+  </div>
+  <div class="badge-row">
+    <span class="badge badge-blue">ProcessLM</span>
+    <span class="badge badge-green">AlgoSim Engine</span>
+    <span class="badge badge-amber">Solar DG Active</span>
+    <span class="badge badge-purple">State Estimation</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KPI STRIP
+════════════════════════════════════════════════════════════════════ -->
+<div class="kpi-strip" id="kpiStrip">
+  <div class="kpi-card">
+    <div class="kpi-label">Avg Voltage</div>
+    <div class="kpi-value" id="kpi-v" style="color:#58a6ff">—</div>
+    <div class="kpi-sub">kV (12.47 kV base)</div>
+    <div class="kpi-delta" id="kpi-v-d">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Peak Real Power</div>
+    <div class="kpi-value" id="kpi-p" style="color:#3fb950">—</div>
+    <div class="kpi-sub">kW demand</div>
+    <div class="kpi-delta" id="kpi-p-d">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Peak Reactive</div>
+    <div class="kpi-value" id="kpi-q" style="color:#bc8cff">—</div>
+    <div class="kpi-sub">kVAR demand</div>
+    <div class="kpi-delta" id="kpi-q-d">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Max Line Current</div>
+    <div class="kpi-value" id="kpi-i" style="color:#d29922">—</div>
+    <div class="kpi-sub">Amperes</div>
+    <div class="kpi-delta" id="kpi-i-d">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Total Losses</div>
+    <div class="kpi-value" id="kpi-l" style="color:#f85149">—</div>
+    <div class="kpi-sub">kWh (24 hr)</div>
+    <div class="kpi-delta" id="kpi-l-d">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Volt Violations</div>
+    <div class="kpi-value" id="kpi-vv" style="color:#ff7b72">—</div>
+    <div class="kpi-sub">bus-hours</div>
+    <div class="kpi-delta" id="kpi-vv-d">—</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     CONTROLS
+════════════════════════════════════════════════════════════════════ -->
+<div class="controls">
+  <span class="ctrl-label">Scenario:</span>
+  <button class="ctrl-btn active" id="btn-base"   onclick="setScenario('base')">Base Load</button>
+  <button class="ctrl-btn"        id="btn-peak"   onclick="setScenario('peak')">Peak Demand</button>
+  <button class="ctrl-btn"        id="btn-solar"  onclick="setScenario('solar')">High Solar</button>
+  <button class="ctrl-btn"        id="btn-storm"  onclick="setScenario('storm')">Storm Event</button>
+  <div class="ctrl-sep"></div>
+  <span class="ctrl-label">Noise:</span>
+  <button class="ctrl-btn active" id="btn-noise-on"  onclick="setNoise(true)">On</button>
+  <button class="ctrl-btn"        id="btn-noise-off" onclick="setNoise(false)">Off</button>
+  <div class="ctrl-sep"></div>
+  <label class="ctrl-toggle" onclick="toggleSolar()">
+    <div class="toggle-box on" id="solarToggle"><div class="toggle-knob"></div></div>
+    <span id="solarLabel">Solar DG</span>
+  </label>
+  <label class="ctrl-toggle" onclick="toggleBands()">
+    <div class="toggle-box on" id="bandsToggle"><div class="toggle-knob"></div></div>
+    <span id="bandsLabel">Confidence Bands</span>
+  </label>
+  <div style="margin-left:auto; font-size:0.72rem; color:var(--text-muted);">
+    <span class="status-dot"></span>Simulation running · Last updated <span id="lastUpdate">—</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PLOTS GRID
+════════════════════════════════════════════════════════════════════ -->
+<div class="plots-grid">
+
+  <!-- Panel 1 — Average Voltage -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <div>
+        <div class="plot-cell-title">① Average Bus Voltage</div>
+        <div class="plot-cell-sub">System-wide mean · ±5% ANSI limits</div>
+      </div>
+      <div class="plot-cell-stat">
+        <div class="stat-val" id="stat-v" style="color:#58a6ff">—</div>
+        <div class="stat-lbl">kV now</div>
+      </div>
+    </div>
+    <div id="plot-voltage" class="plotly-div"></div>
+  </div>
+
+  <!-- Panel 2 — Real Power -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <div>
+        <div class="plot-cell-title">② Total Real Power</div>
+        <div class="plot-cell-sub">Load demand vs. Solar DG generation</div>
+      </div>
+      <div class="plot-cell-stat">
+        <div class="stat-val" id="stat-p" style="color:#3fb950">—</div>
+        <div class="stat-lbl">kW net</div>
+      </div>
+    </div>
+    <div id="plot-power" class="plotly-div"></div>
+  </div>
+
+  <!-- Panel 3 — Reactive Power -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <div>
+        <div class="plot-cell-title">③ Total Reactive Power</div>
+        <div class="plot-cell-sub">Inductive load · Capacitor banks</div>
+      </div>
+      <div class="plot-cell-stat">
+        <div class="stat-val" id="stat-q" style="color:#bc8cff">—</div>
+        <div class="stat-lbl">kVAR net</div>
+      </div>
+    </div>
+    <div id="plot-reactive" class="plotly-div"></div>
+  </div>
+
+  <!-- Panel 4 — Max Line Current -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <div>
+        <div class="plot-cell-title">④ Max Line Current</div>
+        <div class="plot-cell-sub">Thermal limit: 400 A · Critical branches</div>
+      </div>
+      <div class="plot-cell-stat">
+        <div class="stat-val" id="stat-i" style="color:#d29922">—</div>
+        <div class="stat-lbl">A peak</div>
+      </div>
+    </div>
+    <div id="plot-current" class="plotly-div"></div>
+  </div>
+
+  <!-- Panel 5 — System Losses -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <div>
+        <div class="plot-cell-title">⑤ System Losses</div>
+        <div class="plot-cell-sub">I²R feeder losses · Loss reduction from DG</div>
+      </div>
+      <div class="plot-cell-stat">
+        <div class="stat-val" id="stat-l" style="color:#f85149">—</div>
+        <div class="stat-lbl">kW losses</div>
+      </div>
+    </div>
+    <div id="plot-losses" class="plotly-div"></div>
+  </div>
+
+  <!-- Panel 6 — Voltage Violations -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <div>
+        <div class="plot-cell-title">⑥ Voltage Violations</div>
+        <div class="plot-cell-sub">Buses outside ±5% ANSI C84.1 band</div>
+      </div>
+      <div class="plot-cell-stat">
+        <div class="stat-val" id="stat-vv" style="color:#ff7b72">—</div>
+        <div class="stat-lbl">buses</div>
+      </div>
+    </div>
+    <div id="plot-violations" class="plotly-div"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="footer-left">
+    <span class="status-dot"></span>
+    <span>ProcessLM</span> · AlgoSim Distribution Engine · IEEE 33-Bus Benchmark · 
+    State estimation via weighted least squares · Solar DG modeled as negative PQ loads
+  </div>
+  <div style="font-size:0.72rem; color:var(--text-muted);">
+    Simulation © Algocell 2025 · For demonstration purposes
+  </div>
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SIMULATION ENGINE
+════════════════════════════════════════════════════════════════════ -->
+<script>
+/* ─────────────────────────────────────────────────────────────────
+   CONFIGURATION
+───────────────────────────────────────────────────────────────── */
+const N_STEPS   = 96;          // 15-min intervals over 24 h
+const BASE_KV   = 12.47;       // kV nominal
+const N_BUSES   = 33;
+const I_THERMAL = 400;         // A thermal limit
+
+/* Scenario multipliers */
+const SCENARIOS = {
+  base:  { loadMult: 1.00, solarMult: 1.00, noiseMult: 1.0, label: 'Base Load'   },
+  peak:  { loadMult: 1.45, solarMult: 0.70, noiseMult: 1.3, label: 'Peak Demand' },
+  solar: { loadMult: 0.85, solarMult: 1.60, noiseMult: 0.9, label: 'High Solar'  },
+  storm: { loadMult: 1.20, solarMult: 0.25, noiseMult: 2.5, label: 'Storm Event' },
+};
+
+let currentScenario = 'base';
+let noiseEnabled    = true;
+let solarEnabled    = true;
+let bandsEnabled    = true;
+
+/* ─────────────────────────────────────────────────────────────────
+   MATH HELPERS
+───────────────────────────────────────────────────────────────── */
+function randn() {
+  /* Box-Muller */
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function noise(sigma) {
+  return noiseEnabled ? randn() * sigma : 0;
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function linspace(a, b, n) {
+  const arr = [];
+  for (let i = 0; i < n; i++) arr.push(a + (b - a) * i / (n - 1));
+  return arr;
+}
+
+function movingAvg(arr, w) {
+  return arr.map((_, i) => {
+    const lo = Math.max(0, i - Math.floor(w / 2));
+    const hi = Math.min(arr.length, lo + w);
+    const sl = arr.slice(lo, hi);
+    return sl.reduce((a, b) => a + b, 0) / sl.length;
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   TIME AXIS
+───────────────────────────────────────────────────────────────── */
+function buildTimeAxis() {
+  const labels = [];
+  for (let i = 0; i < N_STEPS; i++) {
+    const totalMin = i * 15;
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    labels.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+  }
+  return labels;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   LOAD PROFILE  (residential + commercial blend)
+───────────────────────────────────────────────────────────────── */
+function buildLoadProfile(sc) {
+  const { loadMult, noiseMult } = SCENARIOS[sc];
+  const t = linspace(0, 24, N_STEPS);
+  return t.map(h => {
+    // Morning ramp 6-9, midday plateau, evening peak 17-21, night trough
+    const morning  = 0.55 * Math.exp(-0.5 * Math.pow((h - 7.5) / 1.2, 2));
+    const midday   = 0.40 * Math.exp(-0.5 * Math.pow((h - 12.5) / 2.0, 2));
+    const evening  = 1.00 * Math.exp(-0.5 * Math.pow((h - 19.0) / 1.8, 2));
+    const night    = 0.22;
+    const base     = night + morning + midday + evening;
+    const kw       = clamp(base * 3800 * loadMult + noise(60 * noiseMult), 600, 8000);
+    return kw;
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SOLAR DG PROFILE  (clear-sky + cloud transients)
+───────────────────────────────────────────────────────────────── */
+function buildSolarProfile(sc) {
+  const { solarMult, noiseMult } = SCENARIOS[sc];
+  const t = linspace(0, 24, N_STEPS);
+  return t.map((h, i) => {
+    if (h < 5.5 || h > 20.5) return 0;
+    // Clear-sky bell
+    const clearSky = Math.max(0, Math.sin(Math.PI * (h - 5.5) / 15));
+    // Cloud transients (random dips)
+    const cloudFactor = sc === 'storm'
+      ? clamp(0.3 + 0.4 * Math.random(), 0, 1)
+      : clamp(0.85 + 0.15 * randn(), 0.4, 1.05);
+    const kw = clearSky * 1200 * solarMult * cloudFactor + noise(25 * noiseMult);
+    return Math.max(0, kw);
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   STATE ESTIMATION CORE
+   Simplified WLS-based feeder model for IEEE 33-bus
+───────────────────────────────────────────────────────────────── */
+function runStateEstimation(sc) {
+  const { loadMult, noiseMult } = SCENARIOS[sc];
+  const load  = buildLoadProfile(sc);
+  const solar = buildSolarProfile(sc);
+
+  const avgVoltage   = [];
+  const totalP       = [];
+  const totalQ       = [];
+  const maxCurrent   = [];
+  const sysLosses    = [];
+  const voltViolations = [];
+  const solarGen     = solar;
+  const netLoad      = [];
+
+  for (let i = 0; i < N_STEPS; i++) {
+    const P_load = load[i];
+    const P_solar = solarEnabled ? solar[i] : 0;
+    const P_net   = P_load - P_solar;
+    netLoad.push(P_net);
+
+    // Power factor: 0.88-0.92 lagging, slightly worse at peak
+    const pf = clamp(0.90 - 0.04 * (P_net / 5000) + noise(0.005 * noiseMult), 0.82, 0.97);
+    const Q_net = P_net * Math.tan(Math.acos(pf));
+
+    // Voltage drop model: V = V0 - (R*P + X*Q) / V0
+    // Simplified: voltage sag proportional to net load
+    const R_pu = 0.0012;  // feeder R in pu
+    const X_pu = 0.0008;  // feeder X in pu
+    const S_base = 10000; // kVA base
+    const V_drop = (R_pu * P_net + X_pu * Q_net) / S_base;
+    const V_pu   = clamp(1.0 - V_drop + noise(0.003 * noiseMult), 0.88, 1.06);
+    const V_kv   = V_pu * BASE_KV;
+
+    // Current: I = S / (sqrt(3) * V)
+    const S_kva  = Math.sqrt(P_net * P_net + Q_net * Q_net);
+    const I_amp  = clamp(S_kva / (Math.sqrt(3) * V_kv) + noise(8 * noiseMult), 10, 520);
+
+    // Losses: I²R (simplified, scales with current squared)
+    const R_feeder = 0.18; // Ω total feeder resistance
+    const loss_kw  = clamp((I_amp * I_amp * R_feeder) / 1000 + noise(3 * noiseMult), 2, 180);
+
+    // Voltage violations: buses below 0.95 or above 1.05 pu
+    // More violations when voltage is extreme
+    const v_dev = Math.abs(V_pu - 1.0);
+    let violations = 0;
+    if (V_pu < 0.95) violations = Math.round(clamp((0.95 - V_pu) * 200 + noise(1.5 * noiseMult), 0, N_BUSES));
+    if (V_pu > 1.05) violations = Math.round(clamp((V_pu - 1.05) * 150 + noise(1.0 * noiseMult), 0, N_BUSES));
+    // Solar overvoltage at midday
+    if (solarEnabled && P_solar > 800 && V_pu > 1.02) {
+      violations = Math.max(violations, Math.round(clamp((P_solar - 800) / 80 + noise(1 * noiseMult), 0, 12)));
+    }
+
+    avgVoltage.push(+V_kv.toFixed(4));
+    totalP.push(+P_net.toFixed(1));
+    totalQ.push(+Q_net.toFixed(1));
+    maxCurrent.push(+I_amp.toFixed(1));
+    sysLosses.push(+loss_kw.toFixed(2));
+    voltViolations.push(Math.max(0, violations));
+  }
+
+  return { avgVoltage, totalP, totalQ, maxCurrent, sysLosses, voltViolations, solarGen, netLoad, load };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   CONFIDENCE BANDS  (±1σ from measurement noise model)
+───────────────────────────────────────────────────────────────── */
+function buildBands(arr, sigma_frac) {
+  const upper = arr.map(v => +(v * (1 + sigma_frac)).toFixed(3));
+  const lower = arr.map(v => +(v * (1 - sigma_frac)).toFixed(3));
+  return { upper, lower };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   PLOTLY THEME
+───────────────────────────────────────────────────────────────── */
+const LAYOUT_BASE = {
+  paper_bgcolor: '#161b22',
+  plot_bgcolor:  '#0d1117',
+  font: { family: "'Segoe UI', system-ui, sans-serif", color: '#8b949e', size: 10 },
+  margin: { l: 52, r: 18, t: 8, b: 42 },
+  xaxis: {
+    gridcolor: 'rgba(48,54,61,0.5)',
+    linecolor: '#30363d',
+    tickcolor: '#30363d',
+    tickfont:  { size: 9, color: '#8b949e' },
+    showgrid: true,
+    zeroline: false,
+    tickangle: -35,
+    nticks: 13,
+  },
+  yaxis: {
+    gridcolor: 'rgba(48,54,61,0.5)',
+    linecolor: '#30363d',
+    tickcolor: '#30363d',
+    tickfont:  { size: 9, color: '#8b949e' },
+    showgrid: true,
+    zeroline: false,
+  },
+  legend: {
+    bgcolor: 'rgba(22,27,34,0.85)',
+    bordercolor: '#30363d',
+    borderwidth: 1,
+    font: { size: 9, color: '#8b949e' },
+    x: 0.01, y: 0.99,
+    xanchor: 'left', yanchor: 'top',
+  },
+  hovermode: 'x unified',
+  hoverlabel: {
+    bgcolor: '#1c2128',
+    bordercolor: '#30363d',
+    font: { size: 10, color: '#e6edf3' },
+  },
+};
+
+const PLOTLY_CONFIG = {
+  displayModeBar: false,
+  responsive: true,
+  scrollZoom: false,
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   BAND TRACE HELPER
+───────────────────────────────────────────────────────────────── */
+function bandTrace(t, upper, lower, color, name) {
+  return {
+    x: [...t, ...t.slice().reverse()],
+    y: [...upper, ...lower.slice().reverse()],
+    fill: 'toself',
+    fillcolor: color.replace(')', ',0.12)').replace('rgb', 'rgba'),
+    line: { width: 0 },
+    name: name,
+    showlegend: false,
+    hoverinfo: 'skip',
+    type: 'scatter',
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   RENDER ALL PANELS
+───────────────────────────────────────────────────────────────── */
+function renderAll() {
+  const sc   = currentScenario;
+  const data = runStateEstimation(sc);
+  const t    = buildTimeAxis();
+  const { avgVoltage, totalP, totalQ, maxCurrent, sysLosses, voltViolations, solarGen, load } = data;
+
+  /* ── Update KPIs ── */
+  const peakP  = Math.max(...totalP);
+  const peakQ  = Math.max(...totalQ);
+  const peakI  = Math.max(...maxCurrent);
+  const avgV   = (avgVoltage.reduce((a,b)=>a+b,0)/avgVoltage.length).toFixed(3);
+  const totLoss= (sysLosses.reduce((a,b)=>a+b,0) * 0.25).toFixed(0); // kWh = kW * 0.25h
+  const totVV  = voltViolations.reduce((a,b)=>a+b,0);
+
+  document.getElementById('kpi-v').textContent  = avgV;
+  document.getElementById('kpi-p').textContent  = peakP.toFixed(0);
+  document.getElementById('kpi-q').textContent  = peakQ.toFixed(0);
+  document.getElementById('kpi-i').textContent  = peakI.toFixed(0);
+  document.getElementById('kpi-l').textContent  = totLoss;
+  document.getElementById('kpi-vv').textContent = totVV;
+
+  const vPct = (((+avgV / BASE_KV) - 1) * 100).toFixed(1);
+  document.getElementById('kpi-v-d').innerHTML  = `<span class="${+vPct >= 0 ? 'delta-up' : 'delta-down'}">${+vPct >= 0 ? '▲' : '▼'} ${Math.abs(vPct)}% from nominal</span>`;
+  document.getElementById('kpi-p-d').innerHTML  = `<span class="delta-warn">▲ ${(peakP/3800*100).toFixed(0)}% of rated capacity</span>`;
+  document.getElementById('kpi-q-d').innerHTML  = `<span class="delta-warn">PF ${(Math.cos(Math.atan(peakQ/peakP))).toFixed(3)} lagging</span>`;
+  document.getElementById('kpi-i-d').innerHTML  = `<span class="${peakI > 360 ? 'delta-down' : 'delta-up'}">${(peakI/I_THERMAL*100).toFixed(0)}% of thermal limit</span>`;
+  document.getElementById('kpi-l-d').innerHTML  = `<span class="delta-down">${(+totLoss/peakP*100/24*4).toFixed(1)}% avg loss rate</span>`;
+  document.getElementById('kpi-vv-d').innerHTML = `<span class="${totVV > 20 ? 'delta-down' : 'delta-up'}">${totVV > 0 ? totVV + ' total bus-hours' : '✓ No violations'}</span>`;
+
+  /* Live stats */
+  const lastIdx = N_STEPS - 1;
+  document.getElementById('stat-v').textContent  = avgVoltage[lastIdx].toFixed(3) + ' kV';
+  document.getElementById('stat-p').textContent  = totalP[lastIdx].toFixed(0) + ' kW';
+  document.getElementById('stat-q').textContent  = totalQ[lastIdx].toFixed(0) + ' kVAR';
+  document.getElementById('stat-i').textContent  = maxCurrent[lastIdx].toFixed(0) + ' A';
+  document.getElementById('stat-l').textContent  = sysLosses[lastIdx].toFixed(1) + ' kW';
+  document.getElementById('stat-vv').textContent = voltViolations[lastIdx] + ' buses';
+
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+  /* ── PANEL 1: Average Voltage ── */
+  (() => {
+    const vUpper = avgVoltage.map(v => +(v * 1.005 + 0.008).toFixed(4));
+    const vLower = avgVoltage.map(v => +(v * 0.995 - 0.008).toFixed(4));
+    const vHi    = BASE_KV * 1.05;
+    const vLo    = BASE_KV * 0.95;
+
+    const traces = [];
+
+    if (bandsEnabled) {
+      traces.push(bandTrace(t, vUpper, vLower, 'rgb(88,166,255)', 'SE Uncertainty'));
+    }
+
+    // ANSI upper limit
+    traces.push({
+      x: t, y: Array(N_STEPS).fill(vHi),
+      mode: 'lines', name: 'ANSI +5%',
+      line: { color: '#f85149', width: 1, dash: 'dot' },
+      hoverinfo: 'skip',
+    });
+    // ANSI lower limit
+    traces.push({
+      x: t, y: Array(N_STEPS).fill(vLo),
+      mode: 'lines', name: 'ANSI −5%',
+      line: { color: '#f85149', width: 1, dash: 'dot' },
+      hoverinfo: 'skip',
+    });
+    // Nominal
+    traces.push({
+      x: t, y: Array(N_STEPS).fill(BASE_KV),
+      mode: 'lines', name: 'Nominal',
+      line: { color: '#30363d', width: 1, dash: 'dash' },
+      hoverinfo: 'skip',
+    });
+    // Main voltage trace
+    traces.push({
+      x: t, y: avgVoltage,
+      mode: 'lines', name: 'Avg Voltage',
+      line: { color: '#58a6ff', width: 2.5, shape: 'spline', smoothing: 0.6 },
+      hovertemplate: '%{y:.4f} kV<extra></extra>',
+    });
+
+    const layout = {
+      ...LAYOUT_BASE,
+      yaxis: { ...LAYOUT_BASE.yaxis, title: { text: 'kV', font: { size: 9 } },
+               range: [BASE_KV * 0.91, BASE_KV * 1.07] },
+    };
+    Plotly.react('plot-voltage', traces, layout, PLOTLY_CONFIG);
+  })();
+
+  /* ── PANEL 2: Real Power ── */
+  (() => {
+    const traces = [];
+
+    if (bandsEnabled) {
+      const { upper, lower } = buildBands(totalP, 0.025);
+      traces.push(bandTrace(t, upper, lower, 'rgb(63,185,80)', 'SE Uncertainty'));
+    }
+
+    // Solar generation (filled area)
+    if (solarEnabled) {
+      traces.push({
+        x: t, y: solarGen,
+        mode: 'lines', name: 'Solar DG',
+        fill: 'tozeroy',
+        fillcolor: 'rgba(255,215,0,0.10)',
+        line: { color: '#ffd700', width: 1.5, shape: 'spline', smoothing: 0.7 },
+        hovertemplate: 'Solar: %{y:.0f} kW<extra></extra>',
+      });
+    }
+
+    // Load demand
+    traces.push({
+      x: t, y: load,
+      mode: 'lines', name: 'Load Demand',
+      line: { color: '#8b949e', width: 1.5, dash: 'dot', shape: 'spline', smoothing: 0.5 },
+      hovertemplate: 'Load: %{y:.0f} kW<extra></extra>',
+    });
+
+    // Net real power
+    traces.push({
+      x: t, y: totalP,
+      mode: 'lines', name: 'Net Real Power',
+      line: { color: '#3fb950', width: 2.5, shape: 'spline', smoothing: 0.6 },
+      hovertemplate: 'Net P: %{y:.0f} kW<extra></extra>',
+    });
+
+    const layout = {
+      ...LAYOUT_BASE,
+      yaxis: { ...LAYOUT_BASE.yaxis, title: { text: 'kW', font: { size: 9 } } },
+    };
+    Plotly.react('plot-power', traces, layout, PLOTLY_CONFIG);
+  })();
+
+  /* ── PANEL 3: Reactive Power ── */
+  (() => {
+    const traces = [];
+
+    if (bandsEnabled) {
+      const { upper, lower } = buildBands(totalQ, 0.03);
+      traces.push(bandTrace(t, upper, lower, 'rgb(188,140,255)', 'SE Uncertainty'));
+    }
+
+    // Capacitor bank steps (discrete compensation)
+    const capBank = t.map((_, i) => {
+      const h = i * 15 / 60;
+      if (h >= 7 && h < 9)   return 200;
+      if (h >= 9 && h < 17)  return 400;
+      if (h >= 17 && h < 21) return 600;
+      return 100;
+    });
+
+    traces.push({
+      x: t, y: capBank,
+      mode: 'lines', name: 'Cap Bank',
+      line: { color: '#39d353', width: 1.5, dash: 'dashdot', shape: 'hv' },
+      hovertemplate: 'Cap: %{y:.0f} kVAR<extra></extra>',
+    });
+
+    traces.push({
+      x: t, y: totalQ,
+      mode: 'lines', name: 'Net Reactive',
+      line: { color: '#bc8cff', width: 2.5, shape: 'spline', smoothing: 0.6 },
+      hovertemplate: 'Net Q: %{y:.0f} kVAR<extra></extra>',
+    });
+
+    const layout = {
+      ...LAYOUT_BASE,
+      yaxis: { ...LAYOUT_BASE.yaxis, title: { text: 'kVAR', font: { size: 9 } } },
+    };
+    Plotly.react('plot-reactive', traces, layout, PLOTLY_CONFIG);
+  })();
+
+  /* ── PANEL 4: Max Line Current ── */
+  (() => {
+    const traces = [];
+
+    if (bandsEnabled) {
+      const { upper, lower } = buildBands(maxCurrent, 0.04);
+      traces.push(bandTrace(t, upper, lower, 'rgb(210,153,34)', 'SE Uncertainty'));
+    }
+
+    // Thermal limit
+    traces.push({
+      x: t, y: Array(N_STEPS).fill(I_THERMAL),
+      mode: 'lines', name: 'Thermal Limit',
+      line: { color: '#f85149', width: 1.5, dash: 'dot' },
+      hoverinfo: 'skip',
+    });
+
+    // 80% warning
+    traces.push({
+      x: t, y: Array(N_STEPS).fill(I_THERMAL * 0.8),
+      mode: 'lines', name: '80% Warning',
+      line: { color: '#d29922', width: 1, dash: 'dash' },
+      hoverinfo: 'skip',
+    });
+
+    // Color-coded current (above 80% = amber, above 100% = red)
+    const colorArr = maxCurrent.map(v =>
+      v > I_THERMAL ? '#f85149' : v > I_THERMAL * 0.8 ? '#d29922' : '#d29922'
+    );
+
+    traces.push({
+      x: t, y: maxCurrent,
+      mode: 'lines+markers', name: 'Max Current',
+      line: { color: '#d29922', width: 2.5, shape: 'spline', smoothing: 0.5 },
+      marker: {
+        size: maxCurrent.map(v => v > I_THERMAL * 0.9 ? 5 : 0),
+        color: colorArr,
+        symbol: 'circle',
+      },
+      hovertemplate: '%{y:.1f} A<extra></extra>',
+    });
+
+    const layout = {
+      ...LAYOUT_BASE,
+      yaxis: { ...LAYOUT_BASE.yaxis, title: { text: 'Amperes', font: { size: 9 } },
+               range: [0, Math.max(...maxCurrent) * 1.15] },
+    };
+    Plotly.react('plot-current', traces, layout, PLOTLY_CONFIG);
+  })();
+
+  /* ── PANEL 5: System Losses ── */
+  (() => {
+    const traces = [];
+
+    if (bandsEnabled) {
+      const { upper, lower } = buildBands(sysLosses, 0.05);
+      traces.push(bandTrace(t, upper, lower, 'rgb(248,81,73)', 'SE Uncertainty'));
+    }
+
+    // Loss reduction from solar (counterfactual)
+    const lossNoSolar = sysLosses.map((l, i) => {
+      const solarBoost = solarEnabled ? solarGen[i] * 0.015 : 0;
+      return +(l + solarBoost).toFixed(2);
+    });
+
+    if (solarEnabled) {
+      traces.push({
+        x: t, y: lossNoSolar,
+        mode: 'lines', name: 'Without DG',
+        line: { color: '#8b949e', width: 1.5, dash: 'dot', shape: 'spline', smoothing: 0.5 },
+        hovertemplate: 'No DG: %{y:.1f} kW<extra></extra>',
+      });
+    }
+
+    // Filled area losses
+    traces.push({
+      x: t, y: sysLosses,
+      mode: 'lines', name: 'System Losses',
+      fill: 'tozeroy',
+      fillcolor: 'rgba(248,81,73,0.12)',
+      line: { color: '#f85149', width: 2.5, shape: 'spline', smoothing: 0.6 },
+      hovertemplate: 'Losses: %{y:.1f} kW<extra></extra>',
+    });
+
+    const layout = {
+      ...LAYOUT_BASE,
+      yaxis: { ...LAYOUT_BASE.yaxis, title: { text: 'kW', font: { size: 9 } } },
+    };
+    Plotly.react('plot-losses', traces, layout, PLOTLY_CONFIG);
+  })();
+
+  /* ── PANEL 6: Voltage Violations ── */
+  (() => {
+    // Separate under/over voltage
+    const underV = voltViolations.map((v, i) => {
+      const vpu = avgVoltage[i] / BASE_KV;
+      return vpu < 0.98 ? v : 0;
+    });
+    const overV = voltViolations.map((v, i) => {
+      const vpu = avgVoltage[i] / BASE_KV;
+      return vpu > 1.02 ? v : 0;
+    });
+    const normalV = voltViolations.map((v, i) => (underV[i] === 0 && overV[i] === 0) ? v : 0);
+
+    const traces = [
+      {
+        x: t, y: underV,
+        type: 'bar', name: 'Under-voltage',
+        marker: { color: 'rgba(248,81,73,0.75)', line: { width: 0 } },
+        hovertemplate: 'Under-V: %{y} buses<extra></extra>',
+      },
+      {
+        x: t, y: overV,
+        type: 'bar', name: 'Over-voltage',
+        marker: { color: 'rgba(210,153,34,0.75)', line: { width: 0 } },
+        hovertemplate: 'Over-V: %{y} buses<extra></extra>',
+      },
+      {
+        x: t, y: normalV,
+        type: 'bar', name: 'Marginal',
+        marker: { color: 'rgba(88,166,255,0.5)', line: { width: 0 } },
+        hovertemplate: 'Marginal: %{y} buses<extra></extra>',
+      },
+    ];
+
+    // Rolling average overlay
+    const rollingVV = movingAvg(voltViolations, 5);
+    traces.push({
+      x: t, y: rollingVV,
+      mode: 'lines', name: 'Rolling Avg',
+      line: { color: '#ff7b72', width: 2, shape: 'spline', smoothing: 0.7 },
+      hovertemplate: 'Avg: %{y:.1f}<extra></extra>',
+    });
+
+    const layout = {
+      ...LAYOUT_BASE,
+      barmode: 'stack',
+      yaxis: { ...LAYOUT_BASE.yaxis, title: { text: 'Bus Count', font: { size: 9 } },
+               range: [0, Math.max(...voltViolations, 5) * 1.3] },
+    };
+    Plotly.react('plot-violations', traces, layout, PLOTLY_CONFIG);
+  })();
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   CONTROLS
+───────────────────────────────────────────────────────────────── */
+function setScenario(sc) {
+  currentScenario = sc;
+  ['base','peak','solar','storm'].forEach(s => {
+    document.getElementById('btn-' + s).classList.toggle('active', s === sc);
+  });
+  renderAll();
+}
+
+function setNoise(on) {
+  noiseEnabled = on;
+  document.getElementById('btn-noise-on').classList.toggle('active', on);
+  document.getElementById('btn-noise-off').classList.toggle('active', !on);
+  renderAll();
+}
+
+function toggleSolar() {
+  solarEnabled = !solarEnabled;
+  const el = document.getElementById('solarToggle');
+  el.classList.toggle('on', solarEnabled);
+  document.getElementById('solarLabel').textContent = 'Solar DG';
+  renderAll();
+}
+
+function toggleBands() {
+  bandsEnabled = !bandsEnabled;
+  const el = document.getElementById('bandsToggle');
+  el.classList.toggle('on', bandsEnabled);
+  renderAll();
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   INIT
+───────────────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  renderAll();
+});
+
+/* Optional: auto-refresh every 8 seconds to simulate live data */
+setInterval(() => {
+  if (noiseEnabled) renderAll();
+}, 8000);
+</script>
+</body>
+</html>

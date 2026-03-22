@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6-DOF Robot Manipulator — PD Control Simulation</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    /* ── Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #e6edf3;
+      letter-spacing: -0.5px;
+    }
+    .header h1 span {
+      background: linear-gradient(90deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p {
+      margin-top: 6px;
+      font-size: 0.875rem;
+      color: #8b949e;
+    }
+
+    /* ── Badge row ── */
+    .badges {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .badge {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.75rem;
+      color: #8b949e;
+    }
+    .badge strong { color: #58a6ff; }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .panel:hover { border-color: #388bfd55; }
+
+    .panel-header {
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .panel-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #e6edf3;
+      letter-spacing: 0.3px;
+    }
+    .panel-sub {
+      font-size: 0.7rem;
+      color: #8b949e;
+      margin-left: auto;
+    }
+
+    .plot-container {
+      width: 100%;
+      height: 300px;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 0.72rem;
+      color: #484f58;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>6-DOF Robot Manipulator — <span>PD Control Simulation</span></h1>
+  <p>Rigid-body dynamics · Computed-torque PD controller · Gaussian measurement noise · 5 s horizon</p>
+</div>
+
+<div class="badges">
+  <div class="badge">Joints: <strong>6-DOF</strong></div>
+  <div class="badge">Controller: <strong>PD + Gravity Comp.</strong></div>
+  <div class="badge">Integrator: <strong>RK4</strong></div>
+  <div class="badge">Δt: <strong>1 ms</strong></div>
+  <div class="badge">Noise σ: <strong>0.05°</strong></div>
+  <div class="badge">Trajectory: <strong>Quintic Spline</strong></div>
+</div>
+
+<div class="grid">
+  <!-- Panel 1: Joint Positions -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#58a6ff"></div>
+      <span class="panel-title">Joint Positions — Joints 1, 3, 5</span>
+      <span class="panel-sub">deg</span>
+    </div>
+    <div class="plot-container" id="plot-positions"></div>
+  </div>
+
+  <!-- Panel 2: Joint Velocities -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#3fb950"></div>
+      <span class="panel-title">Joint Velocities — Joints 1, 3, 5</span>
+      <span class="panel-sub">deg/s</span>
+    </div>
+    <div class="plot-container" id="plot-velocities"></div>
+  </div>
+
+  <!-- Panel 3: Control Torques -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#f78166"></div>
+      <span class="panel-title">Control Torques — All 6 Joints</span>
+      <span class="panel-sub">N·m</span>
+    </div>
+    <div class="plot-container" id="plot-torques"></div>
+  </div>
+
+  <!-- Panel 4: Tracking Errors -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#d2a8ff"></div>
+      <span class="panel-title">Tracking Errors — All 6 Joints</span>
+      <span class="panel-sub">deg</span>
+    </div>
+    <div class="plot-container" id="plot-errors"></div>
+  </div>
+
+  <!-- Panel 5: End-Effector XY Trajectory -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#ffa657"></div>
+      <span class="panel-title">End-Effector X–Y Trajectory</span>
+      <span class="panel-sub">mm</span>
+    </div>
+    <div class="plot-container" id="plot-trajectory"></div>
+  </div>
+
+  <!-- Panel 6: RMSE Bar Chart -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot" style="background:#79c0ff"></div>
+      <span class="panel-title">Tracking RMSE by Joint</span>
+      <span class="panel-sub">deg</span>
+    </div>
+    <div class="plot-container" id="plot-rmse"></div>
+  </div>
+</div>
+
+<div class="footer">
+  Algocell · ProcessLM · Robotics Dynamics Module · Simulation only — not real hardware data
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   6-DOF Robot Manipulator PD Control Simulation
+   ─────────────────────────────────────────────
+   Model: Simplified 6-DOF serial manipulator
+   • Decoupled joint-space dynamics with inertia, Coriolis, gravity terms
+   • PD controller with gravity compensation
+   • Quintic polynomial reference trajectories per joint
+   • RK4 numerical integration at 1 ms
+   • Gaussian sensor noise on position measurements
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+(function () {
+  "use strict";
+
+  /* ── Simulation parameters ─────────────────────────────────────────── */
+  const DT      = 0.001;          // integration step [s]
+  const T_END   = 5.0;            // simulation horizon [s]
+  const N       = Math.round(T_END / DT) + 1;
+  const N_DOF   = 6;
+
+  /* ── Robot physical parameters ─────────────────────────────────────── */
+  // Link lengths [m]
+  const L = [0.40, 0.35, 0.30, 0.25, 0.15, 0.10];
+  // Link masses [kg]
+  const M = [8.0,  6.0,  4.5,  3.0,  1.5,  0.8];
+  // Damping coefficients [N·m·s/rad]
+  const B = [2.5,  2.0,  1.8,  1.2,  0.8,  0.5];
+  // Gravity vector magnitude [m/s²]
+  const G = 9.81;
+
+  /* ── PD Gains ───────────────────────────────────────────────────────── */
+  // Kp — proportional gains [N·m/rad]
+  const KP = [800, 650, 500, 350, 200, 120];
+  // Kd — derivative gains [N·m·s/rad]
+  const KD = [80,  65,  50,  35,  20,  12];
+
+  /* ── Reference trajectories (quintic polynomial) ───────────────────── */
+  // Start and end positions [deg] for each joint
+  const Q_START = [  0,   0,   0,   0,   0,   0];
+  const Q_END   = [ 90,  60, -45,  30, -60,  45];
+
+  /* ── Noise ──────────────────────────────────────────────────────────── */
+  const NOISE_STD = 0.05; // [deg] sensor noise standard deviation
+
+  /* ── Utility: Box-Muller Gaussian noise ─────────────────────────────── */
+  function randn() {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+
+  /* ── Quintic polynomial trajectory ─────────────────────────────────── */
+  // Returns [q_ref, dq_ref, ddq_ref] at time t for joint i
+  function quinticRef(t, qi, qf, tf) {
+    const tau = Math.min(t / tf, 1.0);
+    const t2 = tau * tau, t3 = t2 * tau, t4 = t3 * tau, t5 = t4 * tau;
+    const q   = qi + (qf - qi) * (10*t3 - 15*t4 + 6*t5);
+    const dq  = (qf - qi) / tf * (30*t2 - 60*t3 + 30*t4);
+    const ddq = (qf - qi) / (tf*tf) * (60*tau - 180*t2 + 120*t3);
+    return [q, dq, ddq];
+  }
+
+  /* ── Effective joint inertia (simplified, configuration-dependent) ─── */
+  // Uses a simplified model: I_eff(q) = sum of distal link contributions
+  function effectiveInertia(q, joint) {
+    // Simplified: inertia decreases for distal joints
+    // Add configuration-dependent coupling via cos(q) terms
+    let I = M[joint] * L[joint] * L[joint] / 3.0;
+    // Add contributions from distal links
+    for (let k = joint + 1; k < N_DOF; k++) {
+      const dist = L.slice(joint, k+1).reduce((a,b) => a+b, 0);
+      I += M[k] * dist * dist * Math.pow(Math.cos(q[k] * Math.PI / 180), 2) * 0.3;
+    }
+    return Math.max(I, 0.05); // clamp to avoid singularity
+  }
+
+  /* ── Gravity torque for each joint ─────────────────────────────────── */
+  function gravityTorque(q, joint) {
+    // Simplified: gravity torque = sum of distal masses × moment arm
+    let tau_g = 0;
+    for (let k = joint; k < N_DOF; k++) {
+      const arm = L[k] * 0.5;
+      // Effective gravity projection (simplified planar approximation)
+      const angle_rad = q[k] * Math.PI / 180;
+      tau_g += M[k] * G * arm * Math.cos(angle_rad) * (k === joint ? 1.0 : 0.6);
+    }
+    return tau_g;
+  }
+
+  /* ── Coriolis / centrifugal coupling (simplified) ───────────────────── */
+  function coriolisTerm(q, dq, joint) {
+    let c = 0;
+    for (let k = 0; k < N_DOF; k++) {
+      if (k !== joint) {
+        const coupling = 0.02 * M[Math.max(joint,k)] * L[joint] * L[k];
+        c += coupling * dq[k] * dq[k] * Math.sin((q[joint] - q[k]) * Math.PI / 180);
+      }
+    }
+    return c;
+  }
+
+  /* ── RK4 integration step ───────────────────────────────────────────── */
+  function dynamics(q, dq, tau_ctrl, t) {
+    // Returns ddq for each joint
+    const ddq = new Array(N_DOF);
+    for (let i = 0; i < N_DOF; i++) {
+      const I_eff = effectiveInertia(q, i);
+      const tau_g = gravityTorque(q, i);
+      const tau_c = coriolisTerm(q, dq, i);
+      const tau_b = B[i] * dq[i] * (180 / Math.PI); // damping (convert to rad/s internally)
+      // Newton-Euler: I*ddq = tau_ctrl - tau_g - tau_c - tau_b
+      ddq[i] = (tau_ctrl[i] - tau_g - tau_c - tau_b) / I_eff;
+      // Clamp acceleration to realistic limits
+      ddq[i] = Math.max(-500, Math.min(500, ddq[i]));
+    }
+    return ddq;
+  }
+
+  function rk4Step(q, dq, tau_ctrl, t) {
+    // k1
+    const ddq1 = dynamics(q, dq, tau_ctrl, t);
+    // k2
+    const q2  = q.map((v,i)  => v  + 0.5*DT*dq[i]);
+    const dq2 = dq.map((v,i) => v  + 0.5*DT*ddq1[i]);
+    const ddq2 = dynamics(q2, dq2, tau_ctrl, t + 0.5*DT);
+    // k3
+    const q3  = q.map((v,i)  => v  + 0.5*DT*dq2[i]);
+    const dq3 = dq.map((v,i) => v  + 0.5*DT*ddq2[i]);
+    const ddq3 = dynamics(q3, dq3, tau_ctrl, t + 0.5*DT);
+    // k4
+    const q4  = q.map((v,i)  => v  + DT*dq3[i]);
+    const dq4 = dq.map((v,i) => v  + DT*ddq3[i]);
+    const ddq4 = dynamics(q4, dq4, tau_ctrl, t + DT);
+
+    const q_new  = q.map((v,i)  => v  + (DT/6)*(dq[i]  + 2*dq2[i]  + 2*dq3[i]  + dq4[i]));
+    const dq_new = dq.map((v,i) => v  + (DT/6)*(ddq1[i] + 2*ddq2[i] + 2*ddq3[i] + ddq4[i]));
+    return [q_new, dq_new];
+  }
+
+  /* ── PD Controller ──────────────────────────────────────────────────── */
+  function pdControl(q, dq, q_ref, dq_ref, ddq_ref, t) {
+    const tau = new Array(N_DOF);
+    for (let i = 0; i < N_DOF; i++) {
+      const e   = q_ref[i]  - q[i];   // position error [deg]
+      const de  = dq_ref[i] - dq[i];  // velocity error [deg/s]
+      // Gravity compensation
+      const tau_g = gravityTorque(q, i);
+      // PD law + gravity feedforward
+      tau[i] = KP[i] * e * (Math.PI/180) + KD[i] * de * (Math.PI/180) + tau_g;
+      // Torque saturation [N·m]
+      const tau_max = [200, 180, 150, 100, 60, 40][i];
+      tau[i] = Math.max(-tau_max, Math.min(tau_max, tau[i]));
+    }
+    return tau;
+  }
+
+  /* ── Forward kinematics (simplified planar projection for XY) ───────── */
+  // Projects end-effector position onto XY plane using DH-like chain
+  function forwardKinematics(q) {
+    let x = 0, y = 0;
+    let cumAngle = 0;
+    for (let i = 0; i < N_DOF; i++) {
+      cumAngle += q[i] * Math.PI / 180;
+      x += L[i] * Math.cos(cumAngle);
+      y += L[i] * Math.sin(cumAngle);
+    }
+    return [x * 1000, y * 1000]; // convert to mm
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     MAIN SIMULATION LOOP
+     ══════════════════════════════════════════════════════════════════════ */
+  console.time("simulation");
+
+  // Storage arrays (downsample to every 10 ms for plotting = 500 points)
+  const PLOT_DT   = 0.010;
+  const PLOT_N    = Math.round(T_END / PLOT_DT) + 1;
+  const SUBSAMPLE = Math.round(PLOT_DT / DT);
+
+  const time_arr  = new Float64Array(PLOT_N);
+  const q_arr     = Array.from({length: N_DOF}, () => new Float64Array(PLOT_N));
+  const dq_arr    = Array.from({length: N_DOF}, () => new Float64Array(PLOT_N));
+  const tau_arr   = Array.from({length: N_DOF}, () => new Float64Array(PLOT_N));
+  const err_arr   = Array.from({length: N_DOF}, () => new Float64Array(PLOT_N));
+  const qref_arr  = Array.from({length: N_DOF}, () => new Float64Array(PLOT_N));
+  const ee_x      = new Float64Array(PLOT_N);
+  const ee_y      = new Float64Array(PLOT_N);
+  const ee_x_ref  = new Float64Array(PLOT_N);
+  const ee_y_ref  = new Float64Array(PLOT_N);
+
+  // Initial state
+  let q  = Q_START.map(v => v + randn() * 0.1); // slight perturbation
+  let dq = new Array(N_DOF).fill(0);
+  let plotIdx = 0;
+
+  for (let step = 0; step < N; step++) {
+    const t = step * DT;
+
+    // Reference trajectory
+    const q_ref   = new Array(N_DOF);
+    const dq_ref  = new Array(N_DOF);
+    const ddq_ref = new Array(N_DOF);
+    for (let i = 0; i < N_DOF; i++) {
+      const [qr, dqr, ddqr] = quinticRef(t, Q_START[i], Q_END[i], T_END);
+      q_ref[i]   = qr;
+      dq_ref[i]  = dqr;
+      ddq_ref[i] = ddqr;
+    }
+
+    // PD control torques
+    const tau = pdControl(q, dq, q_ref, dq_ref, ddq_ref, t);
+
+    // Store at plot rate
+    if (step % SUBSAMPLE === 0 && plotIdx < PLOT_N) {
+      time_arr[plotIdx] = t;
+      for (let i = 0; i < N_DOF; i++) {
+        // Add sensor noise to stored position
+        const noise = randn() * NOISE_STD;
+        q_arr[i][plotIdx]    = q[i] + noise;
+        dq_arr[i][plotIdx]   = dq[i] + randn() * NOISE_STD * 5;
+        tau_arr[i][plotIdx]  = tau[i] + randn() * 0.1;
+        err_arr[i][plotIdx]  = q_ref[i] - q[i] + noise;
+        qref_arr[i][plotIdx] = q_ref[i];
+      }
+      const [ex, ey] = forwardKinematics(q);
+      const [exr, eyr] = forwardKinematics(q_ref);
+      ee_x[plotIdx] = ex + randn() * 0.5;
+      ee_y[plotIdx] = ey + randn() * 0.5;
+      ee_x_ref[plotIdx] = exr;
+      ee_y_ref[plotIdx] = eyr;
+      plotIdx++;
+    }
+
+    // Integrate
+    [q, dq] = rk4Step(q, dq, tau, t);
+  }
+
+  console.timeEnd("simulation");
+
+  /* ── Convert typed arrays to plain arrays for Plotly ─────────────────── */
+  const T = Array.from(time_arr);
+
+  /* ── Compute RMSE per joint ─────────────────────────────────────────── */
+  const rmse = new Array(N_DOF);
+  for (let i = 0; i < N_DOF; i++) {
+    let sse = 0;
+    for (let k = 0; k < PLOT_N; k++) {
+      sse += err_arr[i][k] * err_arr[i][k];
+    }
+    rmse[i] = Math.sqrt(sse / PLOT_N);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     PLOTLY CONFIGURATION
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const DARK_BG   = '#0d1117';
+  const PANEL_BG  = '#161b22';
+  const GRID_CLR  = '#21262d';
+  const TICK_CLR  = '#8b949e';
+  const FONT_CLR  = '#c9d1d9';
+
+  const baseLayout = {
+    paper_bgcolor: PANEL_BG,
+    plot_bgcolor:  DARK_BG,
+    font: { color: FONT_CLR, family: "'Segoe UI', system-ui, sans-serif", size: 11 },
+    margin: { l: 52, r: 16, t: 12, b: 44 },
+    xaxis: {
+      gridcolor: GRID_CLR, zerolinecolor: GRID_CLR,
+      tickcolor: TICK_CLR, linecolor: GRID_CLR,
+      tickfont: { color: TICK_CLR, size: 10 }
+    },
+    yaxis: {
+      gridcolor: GRID_CLR, zerolinecolor: GRID_CLR,
+      tickcolor: TICK_CLR, linecolor: GRID_CLR,
+      tickfont: { color: TICK_CLR, size: 10 }
+    },
+    legend: {
+      bgcolor: 'rgba(22,27,34,0.85)',
+      bordercolor: GRID_CLR, borderwidth: 1,
+      font: { size: 10, color: FONT_CLR },
+      x: 0.01, y: 0.99, xanchor: 'left', yanchor: 'top'
+    },
+    hovermode: 'x unified',
+    hoverlabel: {
+      bgcolor: '#1c2128', bordercolor: '#388bfd',
+      font: { color: '#e6edf3', size: 11 }
+    }
+  };
+
+  const plotConfig = {
+    responsive: true,
+    displayModeBar: true,
+    modeBarButtonsToRemove: ['select2d','lasso2d','autoScale2d'],
+    displaylogo: false,
+    toImageButtonOptions: { format: 'png', scale: 2 }
+  };
+
+  /* ── Colour palette ─────────────────────────────────────────────────── */
+  const COLORS = {
+    j1: '#58a6ff', j2: '#3fb950', j3: '#d2a8ff',
+    j4: '#ffa657', j5: '#f78166', j6: '#79c0ff',
+    ref: '#484f58'
+  };
+  const JOINT_COLORS = [COLORS.j1, COLORS.j2, COLORS.j3, COLORS.j4, COLORS.j5, COLORS.j6];
+
+  /* ── Helper: thin line style ─────────────────────────────────────────── */
+  function lineStyle(color, dash='solid', width=1.5) {
+    return { color, dash, width };
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PANEL 1 — Joint Positions (Joints 1, 3, 5)
+     ════════════════════════════════════════════════════════════════════ */
+  {
+    const joints = [0, 2, 4]; // 0-indexed
+    const traces = [];
+
+    joints.forEach(i => {
+      // Reference (dashed)
+      traces.push({
+        x: T, y: Array.from(qref_arr[i]),
+        name: `J${i+1} ref`,
+        mode: 'lines',
+        line: lineStyle(JOINT_COLORS[i], 'dash', 1),
+        opacity: 0.5,
+        hovertemplate: `J${i+1} ref: %{y:.2f}°<extra></extra>`
+      });
+      // Actual (solid)
+      traces.push({
+        x: T, y: Array.from(q_arr[i]),
+        name: `J${i+1} actual`,
+        mode: 'lines',
+        line: lineStyle(JOINT_COLORS[i], 'solid', 2),
+        hovertemplate: `J${i+1}: %{y:.2f}°<extra></extra>`
+      });
+    });
+
+    Plotly.newPlot('plot-positions', traces, {
+      ...baseLayout,
+      xaxis: { ...baseLayout.xaxis, title: { text: 'Time (s)', font: { size: 10, color: TICK_CLR } } },
+      yaxis: { ...baseLayout.yaxis, title: { text: 'Position (deg)', font: { size: 10, color: TICK_CLR } } }
+    }, plotConfig);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PANEL 2 — Joint Velocities (Joints 1, 3, 5)
+     ════════════════════════════════════════════════════════════════════ */
+  {
+    const joints = [0, 2, 4];
+    const traces = joints.map(i => ({
+      x: T, y: Array.from(dq_arr[i]),
+      name: `J${i+1}`,
+      mode: 'lines',
+      line: lineStyle(JOINT_COLORS[i], 'solid', 1.8),
+      hovertemplate: `J${i+1} vel: %{y:.2f}°/s<extra></extra>`
+    }));
+
+    // Add zero line
+    traces.push({
+      x: [T[0], T[T.length-1]], y: [0, 0],
+      mode: 'lines', line: { color: '#484f58', dash: 'dot', width: 1 },
+      showlegend: false, hoverinfo: 'skip'
+    });
+
+    Plotly.newPlot('plot-velocities', traces, {
+      ...baseLayout,
+      xaxis: { ...baseLayout.xaxis, title: { text: 'Time (s)', font: { size: 10, color: TICK_CLR } } },
+      yaxis: { ...baseLayout.yaxis, title: { text: 'Velocity (deg/s)', font: { size: 10, color: TICK_CLR } } }
+    }, plotConfig);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PANEL 3 — Control Torques (All 6 Joints)
+     ════════════════════════════════════════════════════════════════════ */
+  {
+    const traces = Array.from({length: N_DOF}, (_, i) => ({
+      x: T, y: Array.from(tau_arr[i]),
+      name: `J${i+1}`,
+      mode: 'lines',
+      line: lineStyle(JOINT_COLORS[i], 'solid', 1.5),
+      hovertemplate: `J${i+1} τ: %{y:.1f} N·m<extra></extra>`
+    }));
+
+    Plotly.newPlot('plot-torques', traces, {
+      ...baseLayout,
+      xaxis: { ...baseLayout.xaxis, title: { text: 'Time (s)', font: { size: 10, color: TICK_CLR } } },
+      yaxis: { ...baseLayout.yaxis, title: { text: 'Torque (N·m)', font: { size: 10, color: TICK_CLR } } }
+    }, plotConfig);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PANEL 4 — Tracking Errors (All 6 Joints)
+     ════════════════════════════════════════════════════════════════════ */
+  {
+    const traces = Array.from({length: N_DOF}, (_, i) => ({
+      x: T, y: Array.from(err_arr[i]),
+      name: `J${i+1}`,
+      mode: 'lines',
+      line: lineStyle(JOINT_COLORS[i], 'solid', 1.5),
+      hovertemplate: `J${i+1} err: %{y:.3f}°<extra></extra>`
+    }));
+
+    // Zero reference
+    traces.push({
+      x: [T[0], T[T.length-1]], y: [0, 0],
+      mode: 'lines', line: { color: '#484f58', dash: 'dot', width: 1 },
+      showlegend: false, hoverinfo: 'skip'
+    });
+
+    Plotly.newPlot('plot-errors', traces, {
+      ...baseLayout,
+      xaxis: { ...baseLayout.xaxis, title: { text: 'Time (s)', font: { size: 10, color: TICK_CLR } } },
+      yaxis: { ...baseLayout.yaxis, title: { text: 'Error (deg)', font: { size: 10, color: TICK_CLR } } }
+    }, plotConfig);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PANEL 5 — End-Effector X–Y Trajectory
+     ════════════════════════════════════════════════════════════════════ */
+  {
+    // Colour by time (gradient effect via marker color)
+    const timeNorm = T.map(t => t / T_END);
+
+    const traces = [
+      // Reference path
+      {
+        x: Array.from(ee_x_ref), y: Array.from(ee_y_ref),
+        name: 'Reference',
+        mode: 'lines',
+        line: { color: '#484f58', dash: 'dash', width: 1.5 },
+        hovertemplate: 'Ref: (%{x:.1f}, %{y:.1f}) mm<extra></extra>'
+      },
+      // Actual path (coloured by time)
+      {
+        x: Array.from(ee_x), y: Array.from(ee_y),
+        name: 'Actual',
+        mode: 'lines+markers',
+        line: { color: '#ffa657', width: 1.5 },
+        marker: {
+          size: 3,
+          color: timeNorm,
+          colorscale: [
+            [0,   '#58a6ff'],
+            [0.33,'#3fb950'],
+            [0.66,'#ffa657'],
+            [1,   '#f78166']
+          ],
+          showscale: true,
+          colorbar: {
+            title: { text: 't (s)', font: { size: 9, color: TICK_CLR } },
+            tickfont: { size: 9, color: TICK_CLR },
+            thickness: 10,
+            len: 0.7,
+            bgcolor: PANEL_BG,
+            bordercolor: GRID_CLR,
+            tickvals: [0, 0.5, 1],
+            ticktext: ['0', '2.5', '5']
+          }
+        },
+        hovertemplate: 'EE: (%{x:.1f}, %{y:.1f}) mm<extra></extra>'
+      },
+      // Start marker
+      {
+        x: [ee_x[0]], y: [ee_y[0]],
+        name: 'Start',
+        mode: 'markers',
+        marker: { color: '#3fb950', size: 10, symbol: 'circle', line: { color: '#0d1117', width: 2 } },
+        hovertemplate: 'Start: (%{x:.1f}, %{y:.1f}) mm<extra></extra>'
+      },
+      // End marker
+      {
+        x: [ee_x[PLOT_N-1]], y: [ee_y[PLOT_N-1]],
+        name: 'End',
+        mode: 'markers',
+        marker: { color: '#f78166', size: 10, symbol: 'square', line: { color: '#0d1117', width: 2 } },
+        hovertemplate: 'End: (%{x:.1f}, %{y:.1f}) mm<extra></extra>'
+      }
+    ];
+
+    Plotly.newPlot('plot-trajectory', traces, {
+      ...baseLayout,
+      hovermode: 'closest',
+      xaxis: {
+        ...baseLayout.xaxis,
+        title: { text: 'X (mm)', font: { size: 10, color: TICK_CLR } },
+        scaleanchor: 'y', scaleratio: 1
+      },
+      yaxis: {
+        ...baseLayout.yaxis,
+        title: { text: 'Y (mm)', font: { size: 10, color: TICK_CLR } }
+      }
+    }, plotConfig);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     PANEL 6 — RMSE Bar Chart
+     ════════════════════════════════════════════════════════════════════ */
+  {
+    const jointLabels = ['Joint 1', 'Joint 2', 'Joint 3', 'Joint 4', 'Joint 5', 'Joint 6'];
+
+    // Compute steady-state RMSE (last 20% of simulation)
+    const ssStart = Math.floor(PLOT_N * 0.8);
+    const rmse_ss = new Array(N_DOF);
+    const rmse_tr = new Array(N_DOF); // transient (first 20%)
+    const trEnd   = Math.floor(PLOT_N * 0.2);
+
+    for (let i = 0; i < N_DOF; i++) {
+      let sse_ss = 0, sse_tr = 0;
+      for (let k = ssStart; k < PLOT_N; k++) sse_ss += err_arr[i][k] ** 2;
+      for (let k = 0; k < trEnd; k++)        sse_tr += err_arr[i][k] ** 2;
+      rmse_ss[i] = Math.sqrt(sse_ss / (PLOT_N - ssStart));
+      rmse_tr[i] = Math.sqrt(sse_tr / trEnd);
+    }
+
+    const traces = [
+      {
+        x: jointLabels, y: rmse_tr,
+        name: 'Transient (0–1 s)',
+        type: 'bar',
+        marker: {
+          color: JOINT_COLORS,
+          opacity: 0.5,
+          line: { color: JOINT_COLORS, width: 1.5 }
+        },
+        hovertemplate: '%{x}: %{y:.4f}°<extra>Transient</extra>'
+      },
+      {
+        x: jointLabels, y: rmse_ss,
+        name: 'Steady-state (4–5 s)',
+        type: 'bar',
+        marker: {
+          color: JOINT_COLORS,
+          opacity: 1.0,
+          line: { color: '#0d1117', width: 1 }
+        },
+        hovertemplate: '%{x}: %{y:.4f}°<extra>Steady-state</extra>'
+      }
+    ];
+
+    // Annotate with RMSE values
+    const annotations = jointLabels.map((lbl, i) => ({
+      x: lbl, y: rmse[i] + 0.002,
+      text: `${rmse[i].toFixed(3)}°`,
+      showarrow: false,
+      font: { size: 9, color: JOINT_COLORS[i] },
+      yanchor: 'bottom'
+    }));
+
+    Plotly.newPlot('plot-rmse', traces, {
+      ...baseLayout,
+      barmode: 'group',
+      bargap: 0.25,
+      bargroupgap: 0.05,
+      annotations,
+      xaxis: {
+        ...baseLayout.xaxis,
+        title: { text: 'Joint', font: { size: 10, color: TICK_CLR } }
+      },
+      yaxis: {
+        ...baseLayout.yaxis,
+        title: { text: 'RMSE (deg)', font: { size: 10, color: TICK_CLR } }
+      }
+    }, plotConfig);
+  }
+
+  /* ── Console summary ─────────────────────────────────────────────────── */
+  console.log("═══════════════════════════════════════════");
+  console.log("  6-DOF Robot PD Control — Simulation Done");
+  console.log("═══════════════════════════════════════════");
+  console.log(`  Steps simulated : ${N.toLocaleString()}`);
+  console.log(`  Plot points     : ${PLOT_N}`);
+  console.log("  RMSE per joint  :");
+  rmse.forEach((r, i) => console.log(`    J${i+1}: ${r.toFixed(4)}°`));
+  console.log("═══════════════════════════════════════════");
+
+})();
+</script>
+</body>
+</html>

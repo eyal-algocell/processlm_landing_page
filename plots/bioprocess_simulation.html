@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fed-Batch CHO Cell Culture — ProcessLM Simulation</title>
+
+  <!-- Plotly CDN -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #58a6ff;
+      --accent2:   #3fb950;
+      --accent3:   #f78166;
+      --accent4:   #d2a8ff;
+      --accent5:   #ffa657;
+      --accent6:   #79c0ff;
+
+      /* panel colours */
+      --c-biomass:   #3fb950;
+      --c-glucose:   #58a6ff;
+      --c-glutamine: #d2a8ff;
+      --c-lactate:   #f78166;
+      --c-ammonia:   #ffa657;
+      --c-mab:       #79c0ff;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    header {
+      padding: 2rem 2.5rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .logo-pill {
+      background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+    }
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+      max-width: 72ch;
+    }
+
+    /* ── Metadata badges ──────────────────────────────────────────── */
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.6rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.22rem 0.65rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .badge span.dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* ── Controls bar ─────────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.9rem 2.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .ctrl-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .ctrl-group label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 110px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .ctrl-val {
+      font-size: 0.78rem;
+      color: var(--accent);
+      font-weight: 600;
+      min-width: 3.2ch;
+    }
+    button.btn {
+      background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.38rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button.btn:hover { opacity: 0.85; }
+    button.btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 0.38rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    button.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── KPI strip ────────────────────────────────────────────────── */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .kpi-card {
+      padding: 0.9rem 1.4rem;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .kpi-card:last-child { border-right: none; }
+    .kpi-name {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
+    }
+    .kpi-val {
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .kpi-unit {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .kpi-delta {
+      font-size: 0.72rem;
+      margin-top: 0.1rem;
+    }
+    .kpi-delta.up   { color: var(--accent2); }
+    .kpi-delta.down { color: var(--accent3); }
+
+    /* ── Plot grid ────────────────────────────────────────────────── */
+    .plot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(3, auto);
+      gap: 1px;
+      background: var(--border);
+      border-top: 1px solid var(--border);
+    }
+    .plot-cell {
+      background: var(--bg);
+      padding: 0.5rem 0.5rem 0.2rem;
+      position: relative;
+    }
+    .plot-cell-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.6rem 0;
+    }
+    .plot-cell-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .plot-cell-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .plot-cell-unit {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .plotly-div {
+      width: 100%;
+      height: 240px;
+    }
+
+    /* ── Feed annotation banner ───────────────────────────────────── */
+    .feed-note {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 166, 87, 0.08);
+      border: 1px solid rgba(255, 166, 87, 0.25);
+      border-radius: 6px;
+      padding: 0.45rem 1rem;
+      font-size: 0.78rem;
+      color: var(--accent5);
+      margin: 0.8rem 2.5rem 0;
+    }
+    .feed-note svg { flex-shrink: 0; }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      padding: 1.2rem 2.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    footer p { font-size: 0.75rem; color: var(--muted); }
+    .footer-brand {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .plot-grid { grid-template-columns: 1fr; }
+      .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+      .kpi-card:nth-child(3) { border-right: none; }
+      .kpi-card:nth-child(4) { border-right: 1px solid var(--border); }
+    }
+    @media (max-width: 560px) {
+      header { padding: 1.2rem 1rem 0.8rem; }
+      .controls { padding: 0.7rem 1rem; }
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+      .kpi-card:nth-child(2n) { border-right: none; }
+      .kpi-card:nth-child(2n+1) { border-right: 1px solid var(--border); }
+      .feed-note { margin: 0.6rem 1rem 0; }
+      footer { padding: 0.8rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="header-top">
+    <span class="logo-pill">ProcessLM</span>
+    <h1>Fed-Batch CHO Cell Culture — Monod Kinetics Simulation</h1>
+  </div>
+  <p class="subtitle">
+    Deterministic ODE model (Monod growth kinetics) with exponential glucose feed strategy,
+    substrate inhibition, metabolic by-product accumulation, and mAb productivity.
+    Measurement noise added via Gaussian perturbation (σ = 2 % of signal).
+  </p>
+  <div class="meta-row">
+    <span class="badge"><span class="dot" style="background:#3fb950"></span>CHO-K1 cell line</span>
+    <span class="badge"><span class="dot" style="background:#58a6ff"></span>Fed-batch mode</span>
+    <span class="badge"><span class="dot" style="background:#d2a8ff"></span>240 h process</span>
+    <span class="badge"><span class="dot" style="background:#ffa657"></span>Feed start: t = 48 h</span>
+    <span class="badge"><span class="dot" style="background:#79c0ff"></span>AlgoSim engine</span>
+    <span class="badge"><span class="dot" style="background:#f78166"></span>Monod + inhibition</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     CONTROLS
+════════════════════════════════════════════════════════════════════ -->
+<div class="controls">
+  <span class="ctrl-label">Parameters</span>
+
+  <div class="ctrl-group">
+    <label>μ<sub>max</sub> (h⁻¹)</label>
+    <input type="range" id="sl-mumax" min="0.02" max="0.06" step="0.002" value="0.038" />
+    <span class="ctrl-val" id="lbl-mumax">0.038</span>
+  </div>
+
+  <div class="ctrl-group">
+    <label>X₀ (g/L)</label>
+    <input type="range" id="sl-x0" min="0.05" max="0.5" step="0.01" value="0.15" />
+    <span class="ctrl-val" id="lbl-x0">0.15</span>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Feed rate α</label>
+    <input type="range" id="sl-alpha" min="0.005" max="0.04" step="0.001" value="0.018" />
+    <span class="ctrl-val" id="lbl-alpha">0.018</span>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Noise σ (%)</label>
+    <input type="range" id="sl-noise" min="0" max="8" step="0.5" value="2" />
+    <span class="ctrl-val" id="lbl-noise">2.0</span>
+  </div>
+
+  <button class="btn" id="btn-run">▶ Re-simulate</button>
+  <button class="btn-ghost" id="btn-reset">Reset</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KPI STRIP
+════════════════════════════════════════════════════════════════════ -->
+<div class="kpi-strip" id="kpi-strip">
+  <div class="kpi-card">
+    <span class="kpi-name">Peak Biomass</span>
+    <span class="kpi-val" id="kpi-biomass" style="color:var(--c-biomass)">—</span>
+    <span class="kpi-unit">g/L</span>
+    <span class="kpi-delta up" id="kpi-biomass-t">—</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-name">Glucose Consumed</span>
+    <span class="kpi-val" id="kpi-glucose" style="color:var(--c-glucose)">—</span>
+    <span class="kpi-unit">g/L total</span>
+    <span class="kpi-delta down" id="kpi-glucose-t">—</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-name">Glutamine Depletion</span>
+    <span class="kpi-val" id="kpi-gln" style="color:var(--c-glutamine)">—</span>
+    <span class="kpi-unit">mM at 240 h</span>
+    <span class="kpi-delta down" id="kpi-gln-t">—</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-name">Peak Lactate</span>
+    <span class="kpi-val" id="kpi-lac" style="color:var(--c-lactate)">—</span>
+    <span class="kpi-unit">g/L</span>
+    <span class="kpi-delta down" id="kpi-lac-t">—</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-name">Peak Ammonia</span>
+    <span class="kpi-val" id="kpi-amm" style="color:var(--c-ammonia)">—</span>
+    <span class="kpi-unit">mM</span>
+    <span class="kpi-delta down" id="kpi-amm-t">—</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-name">Final mAb Titer</span>
+    <span class="kpi-val" id="kpi-mab" style="color:var(--c-mab)">—</span>
+    <span class="kpi-unit">g/L</span>
+    <span class="kpi-delta up" id="kpi-mab-t">—</span>
+  </div>
+</div>
+
+<!-- Feed annotation -->
+<div class="feed-note">
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+    <circle cx="8" cy="8" r="7" stroke="#ffa657" stroke-width="1.5"/>
+    <path d="M8 5v4M8 11v.5" stroke="#ffa657" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+  Exponential glucose feed initiated at <strong>t = 48 h</strong> with rate F(t) = F₀ · e<sup>α(t−48)</sup>.
+  Dashed vertical line marks feed start on all panels.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PLOT GRID
+════════════════════════════════════════════════════════════════════ -->
+<div class="plot-grid">
+
+  <!-- 1. Viable Biomass -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <span class="plot-cell-dot" style="background:var(--c-biomass)"></span>
+      <span class="plot-cell-title">Viable Cell Density (Biomass)</span>
+      <span class="plot-cell-unit">g/L</span>
+    </div>
+    <div class="plotly-div" id="plt-biomass"></div>
+  </div>
+
+  <!-- 2. Glucose -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <span class="plot-cell-dot" style="background:var(--c-glucose)"></span>
+      <span class="plot-cell-title">Glucose Concentration</span>
+      <span class="plot-cell-unit">g/L</span>
+    </div>
+    <div class="plotly-div" id="plt-glucose"></div>
+  </div>
+
+  <!-- 3. Glutamine -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <span class="plot-cell-dot" style="background:var(--c-glutamine)"></span>
+      <span class="plot-cell-title">Glutamine Concentration</span>
+      <span class="plot-cell-unit">mM</span>
+    </div>
+    <div class="plotly-div" id="plt-glutamine"></div>
+  </div>
+
+  <!-- 4. Lactate -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <span class="plot-cell-dot" style="background:var(--c-lactate)"></span>
+      <span class="plot-cell-title">Lactate Accumulation</span>
+      <span class="plot-cell-unit">g/L</span>
+    </div>
+    <div class="plotly-div" id="plt-lactate"></div>
+  </div>
+
+  <!-- 5. Ammonia -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <span class="plot-cell-dot" style="background:var(--c-ammonia)"></span>
+      <span class="plot-cell-title">Ammonia Accumulation</span>
+      <span class="plot-cell-unit">mM</span>
+    </div>
+    <div class="plotly-div" id="plt-ammonia"></div>
+  </div>
+
+  <!-- 6. mAb Titer -->
+  <div class="plot-cell">
+    <div class="plot-cell-header">
+      <span class="plot-cell-dot" style="background:var(--c-mab)"></span>
+      <span class="plot-cell-title">mAb Product Titer</span>
+      <span class="plot-cell-unit">g/L</span>
+    </div>
+    <div class="plotly-div" id="plt-mab"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════════════════ -->
+<footer>
+  <p>Monod kinetics ODE model · RK4 integration (Δt = 0.5 h) · Gaussian noise σ = 2 % · AlgoSim engine</p>
+  <span class="footer-brand">Algocell / ProcessLM</span>
+</footer>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SIMULATION ENGINE  (pure JS — no external deps beyond Plotly)
+════════════════════════════════════════════════════════════════════ -->
+<script>
+"use strict";
+
+/* ─────────────────────────────────────────────────────────────────
+   1.  SEEDED PRNG  (Mulberry32 — reproducible noise)
+───────────────────────────────────────────────────────────────── */
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* Box-Muller using our seeded PRNG */
+function gaussianNoise(rng, sigma) {
+  const u1 = rng(), u2 = rng();
+  return sigma * Math.sqrt(-2 * Math.log(u1 + 1e-12)) * Math.cos(2 * Math.PI * u2);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   2.  MODEL PARAMETERS  (literature-based CHO fed-batch values)
+───────────────────────────────────────────────────────────────── */
+const DEFAULT_PARAMS = {
+  // Growth
+  mu_max:   0.038,   // h⁻¹  max specific growth rate
+  Ks_glc:   0.15,    // g/L  Monod constant for glucose
+  Ks_gln:   0.10,    // mM   Monod constant for glutamine
+  Ki_lac:   2.2,     // g/L  lactate inhibition constant
+  Ki_amm:   4.5,     // mM   ammonia inhibition constant
+  Kd:       0.003,   // h⁻¹  death rate
+
+  // Yields & stoichiometry
+  Yxs_glc:  0.50,    // g biomass / g glucose
+  Yxs_gln:  1.80,    // g biomass / mmol glutamine
+  Ylac_glc: 0.85,    // g lactate / g glucose consumed
+  Yamm_gln: 0.45,    // mmol ammonia / mmol glutamine consumed
+  qmab:     3.5e-4,  // g mAb / g biomass / h  (specific productivity)
+
+  // Maintenance
+  ms_glc:   0.004,   // g glucose / g biomass / h
+  ms_gln:   0.0008,  // mmol gln  / g biomass / h
+
+  // Feed strategy
+  feed_start: 48,    // h
+  F0:         0.002, // L/h  base feed flow rate (per litre culture)
+  alpha:      0.018, // h⁻¹  exponential feed rate constant
+  Sf_glc:    80.0,   // g/L  glucose concentration in feed
+  Sf_gln:     0.0,   // mM   glutamine in feed (glucose-only feed)
+
+  // Initial conditions
+  V0:    1.0,        // L
+  X0:    0.15,       // g/L  viable biomass
+  S0:    6.0,        // g/L  glucose
+  Q0:    4.0,        // mM   glutamine
+  L0:    0.0,        // g/L  lactate
+  A0:    0.0,        // mM   ammonia
+  P0:    0.0,        // g/L  mAb titer
+
+  // Simulation
+  t_end:  240,       // h
+  dt:     0.5,       // h   RK4 step
+  noise_pct: 2.0,    // %   Gaussian noise on measurements
+  seed:   42,
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   3.  ODE SYSTEM
+   State vector: [X, S, Q, L, A, P, V]
+     X = viable biomass (g/L)
+     S = glucose (g/L)
+     Q = glutamine (mM)
+     L = lactate (g/L)
+     A = ammonia (mM)
+     P = mAb titer (g/L)
+     V = culture volume (L)
+───────────────────────────────────────────────────────────────── */
+function odes(t, state, p) {
+  const [X, S, Q, L, A, P, V] = state;
+
+  /* Monod growth with substrate and inhibitor terms */
+  const mu_glc  = S / (p.Ks_glc + S);
+  const mu_gln  = Q / (p.Ks_gln + Q);
+  const inh_lac = p.Ki_lac / (p.Ki_lac + L);
+  const inh_amm = p.Ki_amm / (p.Ki_amm + A);
+
+  const mu = p.mu_max * mu_glc * mu_gln * inh_lac * inh_amm;
+
+  /* Specific consumption / production rates */
+  const qs_glc = mu / p.Yxs_glc + p.ms_glc;          // g glc / g X / h
+  const qs_gln = mu / p.Yxs_gln + p.ms_gln;          // mM gln / g X / h
+  const qL     = p.Ylac_glc * qs_glc;                 // g lac / g X / h
+  const qA     = p.Yamm_gln * qs_gln;                 // mM amm / g X / h
+  const qP     = p.qmab;                               // g mAb / g X / h
+
+  /* Feed flow rate (exponential ramp after t_feed_start) */
+  const F = (t >= p.feed_start)
+    ? p.F0 * Math.exp(p.alpha * (t - p.feed_start))
+    : 0.0;
+  const D = F / V;   // dilution rate (h⁻¹)
+
+  /* ODEs */
+  const dX = (mu - p.Kd - D) * X;
+  const dS = -qs_glc * X + D * (p.Sf_glc - S);
+  const dQ = -qs_gln * X + D * (p.Sf_gln - Q);
+  const dL =  qL * X - D * L;
+  const dA =  qA * X - D * A;
+  const dP =  qP * X - D * P;
+  const dV =  F;
+
+  return [dX, dS, dQ, dL, dA, dP, dV];
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   4.  RK4 INTEGRATOR
+───────────────────────────────────────────────────────────────── */
+function rk4Step(t, state, dt, p) {
+  const f = (tt, ss) => odes(tt, ss, p);
+  const k1 = f(t,        state);
+  const k2 = f(t + dt/2, state.map((s,i) => s + dt/2 * k1[i]));
+  const k3 = f(t + dt/2, state.map((s,i) => s + dt/2 * k2[i]));
+  const k4 = f(t + dt,   state.map((s,i) => s + dt   * k3[i]));
+  return state.map((s,i) => Math.max(0, s + dt/6 * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i])));
+}
+
+function simulate(p) {
+  const steps = Math.round(p.t_end / p.dt) + 1;
+  const rng   = mulberry32(p.seed);
+
+  // Output arrays
+  const t_arr = [], X_arr = [], S_arr = [], Q_arr = [];
+  const L_arr = [], A_arr = [], P_arr = [], V_arr = [];
+
+  // Measurement noise arrays (sampled every 4 h → 60 points)
+  const meas_t = [], mX = [], mS = [], mQ = [], mL = [], mA = [], mP = [];
+
+  let state = [p.X0, p.S0, p.Q0, p.L0, p.A0, p.P0, p.V0];
+  const sigma_frac = p.noise_pct / 100;
+
+  for (let i = 0; i < steps; i++) {
+    const t = i * p.dt;
+    t_arr.push(t);
+    X_arr.push(state[0]); S_arr.push(state[1]); Q_arr.push(state[2]);
+    L_arr.push(state[3]); A_arr.push(state[4]); P_arr.push(state[5]);
+    V_arr.push(state[6]);
+
+    // Simulated offline measurements every 4 h
+    if (i % 8 === 0) {
+      meas_t.push(t);
+      const noise = (v) => Math.max(0, v + gaussianNoise(rng, sigma_frac * v));
+      mX.push(noise(state[0]));
+      mS.push(noise(state[1]));
+      mQ.push(noise(state[2]));
+      mL.push(noise(state[3]));
+      mA.push(noise(state[4]));
+      mP.push(noise(state[5]));
+    }
+
+    state = rk4Step(t, state, p.dt, p);
+  }
+
+  return { t_arr, X_arr, S_arr, Q_arr, L_arr, A_arr, P_arr, V_arr,
+           meas_t, mX, mS, mQ, mL, mA, mP };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   5.  PLOTLY HELPERS
+───────────────────────────────────────────────────────────────── */
+const BG   = '#0d1117';
+const SURF = '#161b22';
+const GRID = '#21262d';
+const TEXT = '#8b949e';
+const FEED_COLOR = 'rgba(255,166,87,0.55)';
+
+function baseLayout(yTitle, color) {
+  return {
+    paper_bgcolor: BG,
+    plot_bgcolor:  BG,
+    margin: { t: 8, b: 36, l: 52, r: 14 },
+    font:   { family: "'Segoe UI', system-ui, sans-serif", size: 11, color: TEXT },
+    xaxis: {
+      title: { text: 'Time (h)', font: { size: 10 } },
+      gridcolor: GRID, zerolinecolor: GRID,
+      tickfont: { size: 10 }, range: [0, 240],
+    },
+    yaxis: {
+      title: { text: yTitle, font: { size: 10, color: color } },
+      gridcolor: GRID, zerolinecolor: GRID,
+      tickfont: { size: 10 },
+    },
+    showlegend: false,
+    hovermode: 'x unified',
+    hoverlabel: {
+      bgcolor: SURF,
+      bordercolor: '#30363d',
+      font: { size: 11, color: '#e6edf3' },
+    },
+  };
+}
+
+function feedShape(yMin, yMax) {
+  return [{
+    type: 'line',
+    x0: 48, x1: 48, y0: yMin, y1: yMax,
+    line: { color: FEED_COLOR, width: 1.5, dash: 'dot' },
+    layer: 'below',
+  }, {
+    type: 'rect',
+    x0: 48, x1: 240, y0: yMin, y1: yMax,
+    fillcolor: 'rgba(255,166,87,0.03)',
+    line: { width: 0 },
+    layer: 'below',
+  }];
+}
+
+function feedAnnotation(yMax) {
+  return [{
+    x: 50, y: yMax * 0.97,
+    text: 'Feed →',
+    showarrow: false,
+    font: { size: 9, color: FEED_COLOR },
+    xanchor: 'left',
+  }];
+}
+
+function lineSeries(t, y, color, name, dash='solid') {
+  return {
+    x: t, y: y,
+    type: 'scatter', mode: 'lines',
+    name: name,
+    line: { color: color, width: 2, dash: dash },
+    hovertemplate: `<b>${name}</b>: %{y:.3f}<extra></extra>`,
+  };
+}
+
+function measureSeries(t, y, color, name) {
+  return {
+    x: t, y: y,
+    type: 'scatter', mode: 'markers',
+    name: name + ' (meas.)',
+    marker: {
+      color: color, size: 5,
+      line: { color: BG, width: 1 },
+      symbol: 'circle',
+    },
+    hovertemplate: `<b>${name} meas.</b>: %{y:.3f}<extra></extra>`,
+  };
+}
+
+const CFG = { responsive: true, displayModeBar: false };
+
+/* ─────────────────────────────────────────────────────────────────
+   6.  RENDER ALL PANELS
+───────────────────────────────────────────────────────────────── */
+function renderAll(p) {
+  const d = simulate(p);
+
+  /* ── Biomass ── */
+  const xMax = Math.max(...d.X_arr) * 1.12;
+  Plotly.react('plt-biomass',
+    [lineSeries(d.t_arr, d.X_arr, '#3fb950', 'Viable Biomass'),
+     measureSeries(d.meas_t, d.mX, '#3fb950', 'Biomass')],
+    { ...baseLayout('X (g/L)', '#3fb950'),
+      shapes: feedShape(0, xMax),
+      annotations: feedAnnotation(xMax) },
+    CFG);
+
+  /* ── Glucose ── */
+  const sMax = Math.max(...d.S_arr) * 1.12;
+  Plotly.react('plt-glucose',
+    [lineSeries(d.t_arr, d.S_arr, '#58a6ff', 'Glucose'),
+     measureSeries(d.meas_t, d.mS, '#58a6ff', 'Glucose')],
+    { ...baseLayout('S (g/L)', '#58a6ff'),
+      shapes: feedShape(0, sMax),
+      annotations: feedAnnotation(sMax) },
+    CFG);
+
+  /* ── Glutamine ── */
+  const qMax = Math.max(...d.Q_arr) * 1.12;
+  Plotly.react('plt-glutamine',
+    [lineSeries(d.t_arr, d.Q_arr, '#d2a8ff', 'Glutamine'),
+     measureSeries(d.meas_t, d.mQ, '#d2a8ff', 'Glutamine')],
+    { ...baseLayout('Q (mM)', '#d2a8ff'),
+      shapes: feedShape(0, qMax),
+      annotations: feedAnnotation(qMax) },
+    CFG);
+
+  /* ── Lactate ── */
+  const lMax = Math.max(...d.L_arr) * 1.12;
+  Plotly.react('plt-lactate',
+    [lineSeries(d.t_arr, d.L_arr, '#f78166', 'Lactate'),
+     measureSeries(d.meas_t, d.mL, '#f78166', 'Lactate')],
+    { ...baseLayout('L (g/L)', '#f78166'),
+      shapes: feedShape(0, lMax),
+      annotations: feedAnnotation(lMax) },
+    CFG);
+
+  /* ── Ammonia ── */
+  const aMax = Math.max(...d.A_arr) * 1.12;
+  Plotly.react('plt-ammonia',
+    [lineSeries(d.t_arr, d.A_arr, '#ffa657', 'Ammonia'),
+     measureSeries(d.meas_t, d.mA, '#ffa657', 'Ammonia')],
+    { ...baseLayout('A (mM)', '#ffa657'),
+      shapes: feedShape(0, aMax),
+      annotations: feedAnnotation(aMax) },
+    CFG);
+
+  /* ── mAb Titer ── */
+  const pMax = Math.max(...d.P_arr) * 1.12;
+  Plotly.react('plt-mab',
+    [lineSeries(d.t_arr, d.P_arr, '#79c0ff', 'mAb Titer'),
+     measureSeries(d.meas_t, d.mP, '#79c0ff', 'mAb Titer')],
+    { ...baseLayout('P (g/L)', '#79c0ff'),
+      shapes: feedShape(0, pMax),
+      annotations: feedAnnotation(pMax) },
+    CFG);
+
+  /* ── KPIs ── */
+  const peakX = Math.max(...d.X_arr);
+  const peakXt = d.t_arr[d.X_arr.indexOf(peakX)];
+  const totalGlc = d.S_arr[0] + (p.F0 / p.V0) * p.Sf_glc *
+    (Math.exp(p.alpha * (p.t_end - p.feed_start)) - 1) / p.alpha;
+  const finalQ = d.Q_arr[d.Q_arr.length - 1];
+  const peakL  = Math.max(...d.L_arr);
+  const peakLt = d.t_arr[d.L_arr.indexOf(peakL)];
+  const peakA  = Math.max(...d.A_arr);
+  const peakAt = d.t_arr[d.A_arr.indexOf(peakA)];
+  const finalP = d.P_arr[d.P_arr.length - 1];
+
+  document.getElementById('kpi-biomass').textContent = peakX.toFixed(2);
+  document.getElementById('kpi-biomass-t').textContent = `↑ peak at t = ${peakXt.toFixed(0)} h`;
+  document.getElementById('kpi-glucose').textContent  = (d.S_arr[0]).toFixed(1);
+  document.getElementById('kpi-glucose-t').textContent = `↓ depleted then fed`;
+  document.getElementById('kpi-gln').textContent      = finalQ.toFixed(2);
+  document.getElementById('kpi-gln-t').textContent    = `↓ from ${p.Q0} mM initial`;
+  document.getElementById('kpi-lac').textContent      = peakL.toFixed(2);
+  document.getElementById('kpi-lac-t').textContent    = `↑ peak at t = ${peakLt.toFixed(0)} h`;
+  document.getElementById('kpi-amm').textContent      = peakA.toFixed(2);
+  document.getElementById('kpi-amm-t').textContent    = `↑ peak at t = ${peakAt.toFixed(0)} h`;
+  document.getElementById('kpi-mab').textContent      = finalP.toFixed(3);
+  document.getElementById('kpi-mab-t').textContent    = `↑ at harvest (240 h)`;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   7.  CONTROLS WIRING
+───────────────────────────────────────────────────────────────── */
+function getParams() {
+  return {
+    ...DEFAULT_PARAMS,
+    mu_max: parseFloat(document.getElementById('sl-mumax').value),
+    X0:     parseFloat(document.getElementById('sl-x0').value),
+    alpha:  parseFloat(document.getElementById('sl-alpha').value),
+    noise_pct: parseFloat(document.getElementById('sl-noise').value),
+    seed: Math.floor(Math.random() * 1e6),  // new seed on each run for noise variety
+  };
+}
+
+function wireSlider(sliderId, labelId, decimals) {
+  const sl  = document.getElementById(sliderId);
+  const lbl = document.getElementById(labelId);
+  sl.addEventListener('input', () => {
+    lbl.textContent = parseFloat(sl.value).toFixed(decimals);
+  });
+}
+
+wireSlider('sl-mumax', 'lbl-mumax', 3);
+wireSlider('sl-x0',    'lbl-x0',    2);
+wireSlider('sl-alpha', 'lbl-alpha', 3);
+wireSlider('sl-noise', 'lbl-noise', 1);
+
+document.getElementById('btn-run').addEventListener('click', () => {
+  renderAll(getParams());
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  document.getElementById('sl-mumax').value = DEFAULT_PARAMS.mu_max;
+  document.getElementById('sl-x0').value    = DEFAULT_PARAMS.X0;
+  document.getElementById('sl-alpha').value = DEFAULT_PARAMS.alpha;
+  document.getElementById('sl-noise').value = DEFAULT_PARAMS.noise_pct;
+  document.getElementById('lbl-mumax').textContent = DEFAULT_PARAMS.mu_max.toFixed(3);
+  document.getElementById('lbl-x0').textContent    = DEFAULT_PARAMS.X0.toFixed(2);
+  document.getElementById('lbl-alpha').textContent = DEFAULT_PARAMS.alpha.toFixed(3);
+  document.getElementById('lbl-noise').textContent = DEFAULT_PARAMS.noise_pct.toFixed(1);
+  renderAll({ ...DEFAULT_PARAMS });
+});
+
+/* ─────────────────────────────────────────────────────────────────
+   8.  INITIAL RENDER
+───────────────────────────────────────────────────────────────── */
+renderAll({ ...DEFAULT_PARAMS });
+</script>
+</body>
+</html>

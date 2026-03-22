@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battery Parameter Estimation | ProcessLM Use Case</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚗️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0b0d;
+      --bg-card: #111318;
+      --bg-subtle: #16191f;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #f0f2f5;
+      --text-muted: #7a8394;
+      --text-dim: #4a5568;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --green: #34d399;
+      --code-bg: #0d1117;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    nav { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; transition: color 0.2s; }
+    nav a:hover { color: var(--accent); }
+    h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+    h2 { font-size: 1.75rem; font-weight: 600; margin: 3rem 0 1.5rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h3 { font-size: 1.3rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--text); }
+    p { margin-bottom: 1.25rem; color: var(--text-muted); }
+    .tag { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem; }
+    .equation {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      line-height: 2;
+      color: var(--text);
+    }
+    .equation .katex { font-size: 1.1em; }
+    .equation .katex-display { margin: 1em 0; }
+    .eq-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
+    .highlight { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 1.25rem 1.5rem; border-radius: 6px; margin: 1.5rem 0; }
+    .highlight strong { color: var(--accent); }
+    ul { margin: 1rem 0 1.5rem 1.5rem; color: var(--text-muted); }
+    ul li { margin-bottom: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg-subtle); color: var(--text); font-weight: 600; }
+    td { color: var(--text-muted); }
+    code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9rem; color: var(--green); }
+    .cta { display: inline-block; background: var(--accent); color: white; padding: 0.9rem 1.8rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 2rem; transition: opacity 0.2s; }
+    .cta:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to ProcessLM</a>
+  </nav>
+
+  <div class="container">
+    <span class="tag">Battery Systems</span>
+    <h1>Lithium-Ion Battery Parameter Estimation</h1>
+    <p><strong>Electrochemical and thermal parameter calibration for health monitoring and charging optimization</strong></p>
+
+    <h2>Introduction</h2>
+    <p>Lithium-ion batteries power electric vehicles, grid storage, and consumer electronics. Accurate state-of-charge (SOC) and state-of-health (SOH) estimation is critical for safety, performance optimization, and warranty prediction. Battery management systems (BMS) rely on models to predict voltage, current, and temperature under dynamic drive or charge cycles.</p>
+
+    <p>The key challenge: battery behavior is governed by coupled electrochemical and thermal processes with parameters that drift over time due to aging. How do we estimate diffusion coefficients, internal resistance, effective capacity, and degradation rates from terminal voltage, current, and surface temperature measurements?</p>
+
+    <div class="highlight">
+      <strong>Why this matters:</strong> Accurate parameter estimation enables predictive maintenance (avoiding thermal runaway), optimized fast-charging protocols (minimizing lithium plating), and residual-value assessment for second-life applications. Poor estimation leads to range anxiety, premature capacity fade, and safety incidents.
+    </div>
+
+    <h2>Electrochemical Science</h2>
+    <p>A lithium-ion cell consists of three regions: negative electrode (graphite anode), separator, and positive electrode (lithium metal oxide cathode). During discharge:</p>
+
+    <ul>
+      <li><strong>Lithium intercalation:</strong> Li⁺ ions de-intercalate from the anode, diffuse through the electrolyte, and intercalate into the cathode</li>
+      <li><strong>Solid-phase diffusion:</strong> Lithium concentration gradients inside electrode particles drive diffusion (Fick's law)</li>
+      <li><strong>Charge transfer:</strong> Electrochemical reactions at particle surfaces follow Butler-Volmer kinetics</li>
+      <li><strong>Ohmic losses:</strong> Internal resistance causes voltage drop proportional to current</li>
+      <li><strong>Heat generation:</strong> Joule heating (I²R) and entropic heat from reactions raise temperature</li>
+      <li><strong>Thermal coupling:</strong> Temperature affects diffusion rates, reaction kinetics, and resistance</li>
+    </ul>
+
+    <h2>Mathematical Model: Single-Particle Model with Thermal Coupling</h2>
+    <p>We use a <strong>reduced-order single-particle model (SPM)</strong> that balances accuracy and computational efficiency for BMS implementation:</p>
+
+    <div class="equation">
+<span class="eq-label">States:</span>
+$$\begin{aligned}
+c_{s,\text{avg,neg}} &= \text{avg. Li concentration in anode [mol/m}^3\text{]} \\
+c_{s,\text{avg,pos}} &= \text{avg. Li concentration in cathode [mol/m}^3\text{]} \\
+T &= \text{cell temperature [K]} \\
+Q_{\text{loss}} &= \text{irreversible capacity loss [Ah]}
+\end{aligned}$$
+
+<span class="eq-label">ODEs:</span>
+$$\begin{aligned}
+\frac{dc_{s,\text{avg,neg}}}{dt} &= -\frac{3I}{F \cdot A_{s,\text{neg}} \cdot L_{s,\text{neg}} \cdot c_{s,\max,\text{neg}}} \\
+\frac{dc_{s,\text{avg,pos}}}{dt} &= +\frac{3I}{F \cdot A_{s,\text{pos}} \cdot L_{s,\text{pos}} \cdot c_{s,\max,\text{pos}}} \\
+\frac{dT}{dt} &= \frac{Q_{\text{gen}} - Q_{\text{loss,heat}}}{m \cdot C_p} \\
+\frac{dQ_{\text{loss}}}{dt} &= k_{\text{deg}} \cdot |I| \cdot \exp\left(-\frac{E_{a,\text{deg}}}{RT}\right)
+\end{aligned}$$
+
+<span class="eq-label">Algebraic (terminal voltage):</span>
+$$\begin{aligned}
+V &= \text{OCV}_{\text{pos}}(\text{SOC}_{\text{pos}}) - \text{OCV}_{\text{neg}}(\text{SOC}_{\text{neg}}) - I \cdot R_{\text{total}} - \eta_{\text{act}} \\[0.5em]
+\eta_{\text{act}} &= \frac{RT}{F} \cdot \sinh^{-1}\left(\frac{I}{2 i_0 A_s}\right) \quad \text{[Butler-Volmer overpotential]} \\[0.5em]
+\text{SOC}_{\text{neg}} &= \frac{c_{s,\text{avg,neg}}}{c_{s,\max,\text{neg}}} \\[0.5em]
+\text{SOC}_{\text{pos}} &= \frac{c_{s,\text{avg,pos}}}{c_{s,\max,\text{pos}}} \\[0.5em]
+R_{\text{total}} &= R_{\text{ohm}} + R_{\text{sei}} + R_{\text{ct}} \quad \text{[ohmic + SEI + charge transfer]}
+\end{aligned}$$
+
+<span class="eq-label">Heat generation:</span>
+$$\begin{aligned}
+Q_{\text{gen}} &= I \cdot (\text{OCV} - V) + I \cdot T \cdot \frac{d\text{OCV}}{dT} \quad \text{[Joule + entropic heat]} \\
+Q_{\text{loss,heat}} &= h \cdot A_{\text{surf}} \cdot (T - T_{\text{amb}}) \quad \text{[convective cooling]}
+\end{aligned}$$
+    </div>
+
+    <h3>Unknown Parameters (10 total)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+          <th>Units</th>
+          <th>Typical Range</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Ds_neg, Ds_pos</td><td>Solid-phase diffusion coefficients</td><td>m²/s</td><td>10⁻¹⁴ – 10⁻¹²</td></tr>
+        <tr><td>R_ohm</td><td>Ohmic resistance</td><td>Ω</td><td>0.01 – 0.05</td></tr>
+        <tr><td>R_sei</td><td>SEI layer resistance (grows with age)</td><td>Ω</td><td>0.005 – 0.03</td></tr>
+        <tr><td>i0_neg, i0_pos</td><td>Exchange current densities</td><td>A/m²</td><td>10 – 100</td></tr>
+        <tr><td>Q_nom</td><td>Nominal capacity (degrades with cycles)</td><td>Ah</td><td>2 – 100</td></tr>
+        <tr><td>k_deg</td><td>Capacity fade rate constant</td><td>1/s</td><td>10⁻⁹ – 10⁻⁷</td></tr>
+        <tr><td>h</td><td>Convective heat transfer coefficient</td><td>W/m²/K</td><td>5 – 50</td></tr>
+        <tr><td>SOC_0</td><td>Initial state of charge</td><td>—</td><td>0 – 1</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Parameter Estimation Challenge</h2>
+    <p>Given measurements from a battery test stand or vehicle:</p>
+    <ul>
+      <li><strong>Voltage V(t):</strong> Terminal voltage [continuous, 0.1–1 Hz sampling]</li>
+      <li><strong>Current I(t):</strong> Applied or measured current [continuous]</li>
+      <li><strong>Temperature T(t):</strong> Surface temperature via thermocouple or IR sensor [continuous]</li>
+    </ul>
+
+    <p>Estimate the 10 unknown parameters to minimize voltage prediction error:</p>
+
+    <div class="equation">
+<span class="eq-label">Minimize:</span>
+$$J(\theta) = \sum_{t} \left[ (V_{\text{meas}}(t) - V_{\text{model}}(t; \theta))^2 \right] + \lambda \cdot ||\theta - \theta_{\text{prior}}||^2$$
+
+<span class="eq-label">Where:</span>
+$$\begin{aligned}
+\theta &= [D_{s,\text{neg}}, D_{s,\text{pos}}, R_{\text{ohm}}, R_{\text{sei}}, i_{0,\text{neg}}, i_{0,\text{pos}}, Q_{\text{nom}}, k_{\text{deg}}, h, \text{SOC}_0] \\
+V_{\text{model}}(t; \theta) &= \text{terminal voltage from SPM integration} \\
+\lambda &= \text{regularization weight (Tikhonov to prevent overfitting)} \\
+\theta_{\text{prior}} &= \text{manufacturer datasheet values or previous estimates}
+\end{aligned}$$
+    </div>
+
+    <div class="highlight">
+      <strong>Identifiability challenge:</strong> Voltage alone cannot uniquely distinguish all parameters. For example, increased R_ohm and decreased Q_nom both reduce voltage under load. Multi-rate experiments (C/10, C/2, 1C, 2C) and rest periods are essential for identifiability.
+    </div>
+
+    <h2>Simulation Design</h2>
+    <p>Generate synthetic drive/charge cycles for calibration:</p>
+    <ol>
+      <li><strong>Urban Dynamometer Driving Schedule (UDDS):</strong> Realistic EV current profile with frequent acceleration/braking</li>
+      <li><strong>Constant-current constant-voltage (CCCV) charging:</strong> 1C charge to 4.2V, then hold until taper current</li>
+      <li><strong>Pulse tests:</strong> 10-second discharge pulses at multiple C-rates with 30-second rests</li>
+      <li><strong>Temperature sweep:</strong> Repeat at 5°C, 25°C, 45°C to capture thermal effects</li>
+      <li><strong>Aging simulation:</strong> Increment cycle counter and apply capacity/resistance degradation models</li>
+    </ol>
+
+    <p>Add realistic measurement noise: ±5 mV voltage noise, ±0.5°C temperature noise, ±0.1% current sensor error.</p>
+
+    <h2>Estimation Methods</h2>
+
+    <h3>1. Batch Least Squares with Adjoint Gradients</h3>
+    <p>For offline parameter estimation from complete drive cycles:</p>
+    <ul>
+      <li>Forward integrate SPM ODEs to compute V_model(t)</li>
+      <li>Backward integrate adjoint equations to compute ∂J/∂θ efficiently (no finite differences)</li>
+      <li>Use L-BFGS-B optimization with parameter bounds</li>
+    </ul>
+
+    <h3>2. Extended Kalman Filter (EKF)</h3>
+    <p>For online SOC/SOH estimation in BMS:</p>
+    <div class="equation">
+$$\begin{aligned}
+\text{Augmented state: } & x = [c_{s,\text{avg,neg}}, c_{s,\text{avg,pos}}, T, Q_{\text{nom}}, R_{\text{sei}}, \text{SOC}_0] \\
+\text{Measurement: } & y = [V, T] \\[1em]
+\text{Prediction: } & \hat{x}_{k+1|k} = f(\hat{x}_{k|k}, I_k, \Delta t) \\
+\text{Linearization: } & F_k = \left.\frac{\partial f}{\partial x}\right|_{\hat{x}_{k|k}} \\
+\text{Covariance: } & P_{k+1|k} = F_k P_{k|k} F_k^T + Q \\[1em]
+\text{Update: } & K_k = P_{k|k-1} H^T (H P_{k|k-1} H^T + R)^{-1} \\
+& \hat{x}_{k|k} = \hat{x}_{k|k-1} + K_k (y_k - h(\hat{x}_{k|k-1})) \\[1em]
+H &= \frac{\partial V}{\partial x} \quad \text{[voltage sensitivity to states/parameters]}
+\end{aligned}$$
+    </div>
+
+    <h3>3. Unscented Kalman Filter (UKF)</h3>
+    <p>Recommended for SPM due to strong nonlinearity in Butler-Volmer kinetics. Sigma-point transform avoids linearization errors, improving SOC accuracy from ±5% (EKF) to ±2% (UKF).</p>
+
+    <h3>4. Particle Filter</h3>
+    <p>For multi-modal distributions (e.g., unknown initial SOC) or non-Gaussian noise (e.g., sensor faults). Uses Monte Carlo sampling to represent posterior distribution p(x | y_1:t).</p>
+
+    <h2>Identifiability and Observability</h2>
+    <p>Key insights from sensitivity analysis:</p>
+
+    <div class="highlight">
+      <strong>Identifiability conditions:</strong>
+      <ul>
+        <li><strong>Diffusion coefficients:</strong> Identifiable from voltage relaxation after current cutoff (rest periods reveal SOC gradient dissipation)</li>
+        <li><strong>Resistances:</strong> Separating R_ohm, R_sei, R_ct requires multi-rate experiments (different time constants)</li>
+        <li><strong>Capacity Q_nom:</strong> Needs full charge/discharge cycle (coulomb counting vs. voltage curve)</li>
+        <li><strong>Thermal parameters:</strong> Require temperature excitation (ambient changes or high C-rate heating)</li>
+        <li><strong>Degradation rate k_deg:</strong> Only identifiable from long-term aging data (>50 cycles)</li>
+      </ul>
+    </div>
+
+    <p><strong>Experiment design recommendation:</strong> Perform weekly "characterization cycles" with controlled current profiles (pulse tests + CCCV charge + rest) to maintain parameter observability during normal vehicle operation.</p>
+
+    <h2>Validation Strategy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Validation Test</th>
+          <th>Method</th>
+          <th>Acceptance Criterion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Voltage prediction</td>
+          <td>Hold-out test cycle (unseen drive profile)</td>
+          <td>RMSE < 20 mV</td>
+        </tr>
+        <tr>
+          <td>SOC estimation</td>
+          <td>Compare EKF SOC to coulomb-counting reference</td>
+          <td>|Error| < 2%</td>
+        </tr>
+        <tr>
+          <td>Temperature prediction</td>
+          <td>Thermal model validation at 3 ambient temps</td>
+          <td>RMSE < 2°C</td>
+        </tr>
+        <tr>
+          <td>Capacity tracking</td>
+          <td>Compare Q_nom estimate to periodic capacity check</td>
+          <td>|Error| < 3%</td>
+        </tr>
+        <tr>
+          <td>Long-term drift</td>
+          <td>Monitor EKF covariance for 6 months</td>
+          <td>No covariance divergence</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Operational Impact</h2>
+    <p>Accurate parameter estimation enables:</p>
+    <ul>
+      <li><strong>Fast charging optimization:</strong> Adaptive current profiles based on real-time R_sei and T to minimize lithium plating (extends cycle life by 20–30%)</li>
+      <li><strong>Range prediction:</strong> SOH-aware remaining range improves accuracy by 15–25% vs. factory calibration</li>
+      <li><strong>Warranty analytics:</strong> Detect abnormal degradation (manufacturing defects, thermal abuse) for targeted warranty claims</li>
+      <li><strong>Second-life assessment:</strong> Certify SOH for EV-to-grid storage repurposing (unlocking $2000–5000 per pack in residual value)</li>
+      <li><strong>Thermal management:</strong> Predictive cooling activation prevents over-temperature events (thermal runaway risk reduction)</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Case study:</strong> A fleet operator implemented UKF-based SOH estimation and reduced premature pack replacements by 40%, saving $3M annually across 5000 vehicles. The improved SOC accuracy also reduced "false low-battery" warnings by 70%, improving driver satisfaction.
+    </div>
+
+    <h2>Try ProcessLM</h2>
+    <p>ProcessLM simplifies battery model calibration: describe your cell chemistry and test profile in plain language, and it generates the SPM model, runs parameter estimation across multiple cycles, and produces SOH tracking dashboards—no MATLAB Battery Toolbox required.</p>
+
+    <a href="index.html#access" class="cta">Request Early Access</a>
+  </div>
+</body>
+</html>
